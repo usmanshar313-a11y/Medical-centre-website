@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "admin@rafahemedical.com" ||
+        request.auth.token.email == "admin@rafahmedical.com" ||
+        request.auth.token.admin == true
+      );
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Patients collection
+    match /patients/{patientId} {
+      allow read: if isOwner(patientId) || isAdmin();
+      allow create, update: if isOwner(patientId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Appointments collection
+    match /appointments/{appointmentId} {
+      allow create: if true; // allow guest & logged-in appointment booking
+      allow read: if isAdmin() || (request.auth != null && resource.data.patientId == request.auth.uid);
+      allow update: if isAdmin() || (request.auth != null && resource.data.patientId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Doctors collection
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Services collection
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      allow read: if isAdmin() || (request.auth != null && resource.data.patientId == request.auth.uid);
+      allow create: if isAdmin() || (request.auth != null && request.resource.data.patientId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+  }
+}
