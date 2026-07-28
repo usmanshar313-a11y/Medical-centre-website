@@ -17,13 +17,13 @@ const app = appExists ? getApp() : initializeApp(firebaseConfig);
 
 const dbId = config.firestoreDatabaseId || '(default)';
 
-// Initialize Firestore with force long polling to ensure reliable connection in iframe/sandbox environments
+// Initialize Firestore with auto detect long polling for smooth network failover in sandbox environments
 export const db = appExists
   ? getFirestore(app, dbId)
   : initializeFirestore(
       app,
       {
-        experimentalForceLongPolling: true,
+        experimentalAutoDetectLongPolling: true,
       },
       dbId
     );
