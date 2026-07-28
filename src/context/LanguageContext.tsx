@@ -1,31 +1,27 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Language, translations } from '../translations/i18n';
+import React, { createContext, useContext, useEffect } from 'react';
+import { translations } from '../translations/i18n';
 
 interface LanguageContextType {
-  language: Language;
-  setLanguage: (lang: Language) => void;
+  language: 'en';
+  setLanguage: (lang: 'en') => void;
   t: typeof translations.en;
-  isUrdu: boolean;
+  isUrdu: false;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>(() => {
-    return (localStorage.getItem('rafah_lang') as Language) || 'en';
-  });
+  const language = 'en';
+  const isUrdu = false;
+  const t = translations.en;
 
-  const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
-    localStorage.setItem('rafah_lang', lang);
+  const setLanguage = () => {
+    // Single language (English) enforcement
   };
 
-  const isUrdu = language === 'ur';
-  const t = translations[language];
-
   useEffect(() => {
-    document.dir = isUrdu ? 'rtl' : 'ltr';
-  }, [isUrdu]);
+    document.dir = 'ltr';
+  }, []);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t, isUrdu }}>
@@ -41,3 +37,4 @@ export const useLanguage = () => {
   }
   return context;
 };
+

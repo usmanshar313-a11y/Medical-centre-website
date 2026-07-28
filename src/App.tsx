@@ -7,6 +7,8 @@ import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
 import { FloatingWhatsApp } from './components/common/FloatingWhatsApp';
 import { HomePage } from './pages/HomePage';
+import { DepartmentsPage } from './pages/DepartmentsPage';
+import { AboutPage } from './pages/AboutPage';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -45,6 +47,14 @@ const AppContent: React.FC = () => {
         >
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/departments" element={<DepartmentsPage />} />
+            <Route path="/departments.html" element={<DepartmentsPage />} />
+            <Route path="/services" element={<DepartmentsPage />} />
+            <Route path="/services.html" element={<DepartmentsPage />} />
+            <Route path="/doctors" element={<DepartmentsPage />} />
+            <Route path="/doctors.html" element={<DepartmentsPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/about.html" element={<AboutPage />} />
             <Route path="/portal/*" element={<PortalPage />} />
             <Route path="/admin/*" element={<AdminApp />} />
             <Route path="/terms" element={<TermsPage />} />

@@ -40,6 +40,19 @@ export interface Doctor {
   availableDays?: string[] | string;
   phone?: string;
   roomNumber?: string;
+  fee?: string;
+  departmentId?: string;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  description: string;
+  timing?: string;
+  days?: string;
+  fee?: string;
+  icon?: string;
+  doctors: Doctor[];
 }
 
 export interface Service {

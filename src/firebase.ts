@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import config from '../firebase-applet-config.json';
 
@@ -12,12 +12,21 @@ const firebaseConfig = {
   appId: config.appId,
 };
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const appExists = getApps().length > 0;
+const app = appExists ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with specific database ID if present in config
-export const db = config.firestoreDatabaseId
-  ? getFirestore(app, config.firestoreDatabaseId)
-  : getFirestore(app);
+const dbId = config.firestoreDatabaseId || '(default)';
+
+// Initialize Firestore with force long polling to ensure reliable connection in iframe/sandbox environments
+export const db = appExists
+  ? getFirestore(app, dbId)
+  : initializeFirestore(
+      app,
+      {
+        experimentalForceLongPolling: true,
+      },
+      dbId
+    );
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

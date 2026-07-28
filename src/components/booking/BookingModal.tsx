@@ -7,12 +7,13 @@ import {
   Phone, 
   Mail, 
   Stethoscope, 
-  FileText, 
   CheckCircle2, 
   MessageSquare,
-  Sparkles
+  Lock,
+  AlertTriangle,
+  LogIn
 } from 'lucide-react';
-import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -86,12 +87,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   preselectedDoctorId,
   preselectedServiceId,
 }) => {
-  const { user, patientProfile } = useAuth();
+  const { user, patientProfile, signInWithGoogle } = useAuth();
   const { t } = useLanguage();
 
   const [doctors, setDoctors] = useState<Doctor[]>(DEFAULT_DOCTORS);
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
-  const [loadingDocs, setLoadingDocs] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
@@ -104,9 +104,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [reason, setReason] = useState('');
   const [isReturning, setIsReturning] = useState(false);
 
+  // Security & Mandatory Checkbox states
+  const [confirmedDetails, setConfirmedDetails] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [signingIn, setSigningIn] = useState(false);
 
   // Prefill when opened
   useEffect(() => {
@@ -128,16 +132,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       if (preselectedDoctorId) setDoctorId(preselectedDoctorId);
       if (preselectedServiceId) setService(preselectedServiceId);
 
-      // Fetch doctors & services from Firestore
+      setConfirmedDetails(false);
       fetchMetadata();
     } else {
       setSubmitted(false);
       setErrorMsg('');
+      setConfirmedDetails(false);
     }
   }, [isOpen, user, patientProfile, preselectedDoctorId, preselectedServiceId]);
 
   const fetchMetadata = async () => {
-    setLoadingDocs(true);
     try {
       // Doctors
       const docSnap = await getDocs(collection(db, 'doctors'));
@@ -152,15 +156,54 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       if (fetchedServs.length > 0) setServices(fetchedServs);
     } catch (e) {
       console.warn('Using default services list', e);
-    } finally {
-      setLoadingDocs(false);
     }
   };
 
   if (!isOpen) return null;
 
+  // Handle mandatory confirmation checkbox with immediate alert requirement
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = e.target.checked;
+    if (isChecked) {
+      // Trigger JS alert immediately as required
+      window.alert(
+        "It is requested to provide the correct Phone/WhatsApp number and email in order to receive confirmation of your appointment."
+      );
+      setConfirmedDetails(true);
+      setErrorMsg('');
+    } else {
+      setConfirmedDetails(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setSigningIn(true);
+    setErrorMsg('');
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      console.error('Sign in error:', err);
+      setErrorMsg('Failed to sign in with Google. Please try again.');
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Login Requirement Check
+    if (!user) {
+      setErrorMsg('Authentication Required: You must log in first before booking an appointment.');
+      return;
+    }
+
+    // 2. Mandatory Confirmation Checkbox
+    if (!confirmedDetails) {
+      setErrorMsg('Please confirm the details checkbox ("I confirm my details are correct") before booking.');
+      return;
+    }
+
     if (!name || !phone || !preferredDate || !preferredTime || (!service && !doctorId)) {
       setErrorMsg('Please fill in all required fields (Name, Phone, Date, Time, and Service).');
       return;
@@ -174,7 +217,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       const selectedServ = services.find((s) => s.id === service)?.name || service || 'General OPD';
 
       const appointmentData = {
-        patientId: user ? user.uid : 'guest',
+        patientId: user.uid,
         patientName: name,
         phone,
         email,
@@ -207,7 +250,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
     const filtered = doctors.filter((d) => {
       const spec = (d.specialty || '').toLowerCase();
-      
       if (selectedName.includes('general physician')) {
         return spec.includes('general physician') || spec.includes('family physician') || spec.includes('physician');
       }
@@ -253,7 +295,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       if (selectedName.includes('dental')) {
         return spec.includes('dental');
       }
-
       return spec.includes(selectedName) || selectedName.includes(spec);
     });
 
@@ -269,7 +310,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       
-      {/* Container: Bottom-sheet style on mobile, rounded modal on desktop */}
+      {/* Container */}
       <div className="bg-[#F5F1E8] text-[#0B6B4E] w-full max-w-2xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border border-emerald-900/10">
         
         {/* Modal Header */}
@@ -328,18 +369,38 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {!user && (
+              {/* Login Requirement Banner */}
+              {!user ? (
+                <div className="bg-amber-50 border border-amber-300 p-4 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                    <Lock className="w-4 h-4 text-[#D64545]" />
+                    <span>Authentication Required to Book</span>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    Appointment booking is restricted to authenticated patients. Please sign in to verify your contact information and confirm your slot.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={signingIn}
+                    className="w-full bg-[#0B6B4E] hover:bg-[#08523c] text-white py-2.5 px-4 rounded-xl text-xs font-bold shadow flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>{signingIn ? 'Signing In...' : 'Sign In with Google to Continue'}</span>
+                  </button>
+                </div>
+              ) : (
                 <div className="bg-emerald-900/5 p-3 rounded-xl border border-emerald-800/10 text-xs text-emerald-900 flex items-center justify-between">
-                  <span>Guest booking enabled. Have an account?</span>
-                  <span className="font-bold text-[#0B6B4E] underline cursor-pointer">
-                    Sign in to track status
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Logged in as: {user.displayName || user.email}
                   </span>
                 </div>
               )}
 
               {errorMsg && (
-                <div className="p-3 bg-red-100 border border-red-300 text-red-700 text-xs rounded-xl font-medium">
-                  {errorMsg}
+                <div className="p-3 bg-red-100 border border-red-300 text-red-700 text-xs rounded-xl font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
                 </div>
               )}
 
@@ -520,14 +581,32 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 />
               </div>
 
-              {/* Submit CTA */}
+              {/* Mandatory Confirmation Checkbox */}
+              <div className="p-3 bg-[#F5F1E8] rounded-xl border border-emerald-900/15 flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="confirmDetailsCheckbox"
+                  checked={confirmedDetails}
+                  onChange={handleCheckboxChange}
+                  className="w-4 h-4 mt-0.5 accent-[#0B6B4E] rounded cursor-pointer shrink-0"
+                />
+                <label htmlFor="confirmDetailsCheckbox" className="text-xs text-emerald-950 font-medium cursor-pointer">
+                  I confirm my details (Phone/WhatsApp number & email) are correct.
+                </label>
+              </div>
+
+              {/* Submit CTA - Disabled when not logged in or checkbox unchecked */}
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full bg-[#D64545] hover:bg-[#c23737] text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+                disabled={submitting || !user || !confirmedDetails}
+                className="w-full bg-[#D64545] hover:bg-[#c23737] text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
               >
                 {submitting ? (
                   <span>Submitting Request...</span>
+                ) : !user ? (
+                  <span>Log In Required to Submit</span>
+                ) : !confirmedDetails ? (
+                  <span>Please Confirm Checkbox Above</span>
                 ) : (
                   <>
                     <Calendar className="w-4 h-4" />

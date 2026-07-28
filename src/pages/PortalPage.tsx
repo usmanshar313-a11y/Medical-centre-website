@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Calendar, 
-  FileText, 
   Settings, 
   Clock, 
   CheckCircle2, 
   XCircle, 
   AlertCircle, 
   Printer, 
-  Upload, 
-  Download, 
   Phone, 
   Heart, 
   Plus, 
@@ -24,23 +21,20 @@ import {
   where, 
   getDocs, 
   doc, 
-  updateDoc, 
-  addDoc, 
-  orderBy 
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { Appointment, MedicalReport, AppointmentStatus } from '../types';
+import { Appointment, AppointmentStatus } from '../types';
 import { BookingModal } from '../components/booking/BookingModal';
 
 export const PortalPage: React.FC = () => {
   const { user, patientProfile, loading, signInWithGoogle, updatePatientProfile, logout } = useAuth();
   const { t } = useLanguage();
 
-  const [activeTab, setActiveTab] = useState<'appointments' | 'book' | 'reports' | 'profile'>('appointments');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'book' | 'profile'>('appointments');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [reports, setReports] = useState<MedicalReport[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Print modal
@@ -54,13 +48,6 @@ export const PortalPage: React.FC = () => {
   const [profileEmergencyContact, setProfileEmergencyContact] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
-
-  // Report Upload state
-  const [reportFileName, setReportFileName] = useState('');
-  const [reportFileUrl, setReportFileUrl] = useState('');
-  const [reportDesc, setReportDesc] = useState('');
-  const [uploadingReport, setUploadingReport] = useState(false);
-  const [reportUploadSuccess, setReportUploadSuccess] = useState('');
 
   // Embedded booking modal
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
@@ -85,25 +72,32 @@ export const PortalPage: React.FC = () => {
     if (!user) return;
     setLoadingData(true);
     try {
-      // Fetch Appointments
+      // Fetch Appointments by patientId
       const apptQ = query(collection(db, 'appointments'), where('patientId', '==', user.uid));
       const apptSnap = await getDocs(apptQ);
       const fetchedAppts: Appointment[] = [];
+      const seenIds = new Set<string>();
+
       apptSnap.forEach((d) => {
+        seenIds.add(d.id);
         fetchedAppts.push({ id: d.id, ...d.data() } as Appointment);
       });
-      // Sort client-side
-      fetchedAppts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setAppointments(fetchedAppts);
 
-      // Fetch Reports
-      const reportQ = query(collection(db, 'reports'), where('patientId', '==', user.uid));
-      const reportSnap = await getDocs(reportQ);
-      const fetchedReports: MedicalReport[] = [];
-      reportSnap.forEach((r) => {
-        fetchedReports.push({ id: r.id, ...r.data() } as MedicalReport);
-      });
-      setReports(fetchedReports);
+      // Also query by user email if available
+      if (user.email) {
+        const apptQ2 = query(collection(db, 'appointments'), where('email', '==', user.email));
+        const apptSnap2 = await getDocs(apptQ2);
+        apptSnap2.forEach((d) => {
+          if (!seenIds.has(d.id)) {
+            seenIds.add(d.id);
+            fetchedAppts.push({ id: d.id, ...d.data() } as Appointment);
+          }
+        });
+      }
+
+      // Sort client-side by creation date
+      fetchedAppts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setAppointments(fetchedAppts);
     } catch (err) {
       console.error('Error fetching patient data:', err);
     } finally {
@@ -112,15 +106,17 @@ export const PortalPage: React.FC = () => {
   };
 
   const handleCancelAppointment = async (apptId: string) => {
-    if (!window.confirm('Are you sure you want to cancel this appointment request?')) return;
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
     try {
       const ref = doc(db, 'appointments', apptId);
       await updateDoc(ref, { status: 'cancelled' });
       setAppointments((prev) =>
         prev.map((a) => (a.id === apptId ? { ...a, status: 'cancelled' } : a))
       );
+      alert('Your appointment has been cancelled successfully.');
     } catch (err) {
       console.error('Failed to cancel appointment:', err);
+      alert('Failed to cancel appointment. Please check your network connection or try again.');
     }
   };
 
@@ -141,34 +137,6 @@ export const PortalPage: React.FC = () => {
       console.error('Profile update failed:', err);
     } finally {
       setProfileSaving(false);
-    }
-  };
-
-  const handleUploadReport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reportFileName || !reportFileUrl) return;
-    setUploadingReport(true);
-    setReportUploadSuccess('');
-    try {
-      const newRep = {
-        patientId: user!.uid,
-        patientName: patientProfile?.name || user!.displayName || 'Patient',
-        fileName: reportFileName,
-        fileUrl: reportFileUrl,
-        uploadedBy: 'patient' as const,
-        uploadedAt: new Date().toISOString(),
-        description: reportDesc,
-      };
-      const ref = await addDoc(collection(db, 'reports'), newRep);
-      setReports((prev) => [{ id: ref.id, ...newRep }, ...prev]);
-      setReportFileName('');
-      setReportFileUrl('');
-      setReportDesc('');
-      setReportUploadSuccess('Report uploaded successfully!');
-    } catch (err) {
-      console.error('Report upload error:', err);
-    } finally {
-      setUploadingReport(false);
     }
   };
 
@@ -242,7 +210,7 @@ export const PortalPage: React.FC = () => {
               Patient Portal Access
             </h2>
             <p className="text-xs sm:text-sm text-emerald-900/80 mt-2">
-              Sign in to manage your appointments, view medical lab reports, and update your patient profile.
+              Sign in to manage your appointments, book doctor visits, and update your patient profile.
             </p>
           </div>
 
@@ -342,18 +310,6 @@ export const PortalPage: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             <span>Book New Appointment</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
-              activeTab === 'reports'
-                ? 'bg-[#0B6B4E] text-white shadow-xs'
-                : 'text-emerald-900 hover:bg-[#F5F1E8]'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Medical Reports ({reports.length})</span>
           </button>
 
           <button
@@ -466,98 +422,7 @@ export const PortalPage: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 2: Medical Reports */}
-        {activeTab === 'reports' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading font-bold text-xl text-[#0B6B4E]">
-                Medical Lab Reports & Documents
-              </h2>
-            </div>
-
-            {/* Upload form for patient */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
-              <h3 className="font-heading font-bold text-sm text-[#0B6B4E] flex items-center gap-2">
-                <Upload className="w-4 h-4 text-[#0B6B4E]" />
-                Share Prescription or Previous Medical Document
-              </h3>
-
-              {reportUploadSuccess && (
-                <div className="p-3 bg-emerald-100 text-[#0B6B4E] text-xs font-bold rounded-xl">
-                  {reportUploadSuccess}
-                </div>
-              )}
-
-              <form onSubmit={handleUploadReport} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input
-                  type="text"
-                  required
-                  placeholder="Document Title (e.g. Blood Test Report)"
-                  value={reportFileName}
-                  onChange={(e) => setReportFileName(e.target.value)}
-                  className="bg-[#F5F1E8] border border-emerald-900/20 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-                <input
-                  type="url"
-                  required
-                  placeholder="Document File Link / URL (PDF or Image)"
-                  value={reportFileUrl}
-                  onChange={(e) => setReportFileUrl(e.target.value)}
-                  className="bg-[#F5F1E8] border border-emerald-900/20 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={uploadingReport}
-                  className="bg-[#0B6B4E] hover:bg-[#08523c] text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer disabled:opacity-50"
-                >
-                  {uploadingReport ? 'Saving...' : 'Upload Document'}
-                </button>
-              </form>
-            </div>
-
-            {/* List of Reports */}
-            {reports.length === 0 ? (
-              <div className="bg-white p-12 rounded-2xl text-center text-xs text-emerald-900/70 space-y-2">
-                <FileText className="w-10 h-10 text-emerald-800/30 mx-auto" />
-                <p>No medical reports uploaded yet. Reports uploaded by the hospital will appear here.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reports.map((rep) => (
-                  <div
-                    key={rep.id}
-                    className="bg-white p-5 rounded-2xl border border-emerald-900/10 shadow-xs flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-emerald-100 text-[#0B6B4E] rounded-xl">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-sm text-[#0B6B4E]">{rep.fileName}</div>
-                        <div className="text-[11px] text-emerald-900/70">
-                          Uploaded by: {rep.uploadedBy === 'admin' ? 'Rafah-E-Aam Clinic' : 'Patient'} •{' '}
-                          {new Date(rep.uploadedAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-
-                    <a
-                      href={rep.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-[#0B6B4E] hover:bg-[#08523c] text-white p-2.5 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span className="hidden sm:inline">View File</span>
-                    </a>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 3: My Profile */}
+        {/* Tab 2: My Profile */}
         {activeTab === 'profile' && (
           <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-emerald-900/10 space-y-6 max-w-2xl mx-auto">
             <h2 className="font-heading font-bold text-xl text-[#0B6B4E]">

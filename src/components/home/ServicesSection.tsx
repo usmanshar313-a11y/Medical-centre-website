@@ -1,227 +1,116 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Stethoscope, 
   ShieldAlert, 
   FlaskConical, 
-  Pill, 
-  Baby, 
   HeartHandshake, 
-  Syringe, 
-  Calendar,
-  ChevronRight 
+  Baby, 
+  ArrowRight,
+  CheckCircle2
 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { Service } from '../../types';
-import { useLanguage } from '../../context/LanguageContext';
 
 interface ServicesSectionProps {
-  onSelectService: (serviceId: string) => void;
+  onSelectService?: (serviceId: string) => void;
 }
 
-const DEFAULT_SERVICES: Service[] = [
-  {
-    id: 'gen-physician',
-    name: 'General Physician',
-    description: 'Comprehensive adult outpatient care, hypertension control, fever management, diabetes screening, and general medical checkups.',
-    icon: 'stethoscope',
-    department: 'Outpatient Care',
-  },
-  {
-    id: 'orthopedics',
-    name: 'Orthopedic Surgery',
-    description: 'Specialized bone and joint consultations, fracture management, spinal care, arthritis treatment, and orthopedic trauma care.',
-    icon: 'stethoscope',
-    department: 'Orthopedics',
-  },
-  {
-    id: 'cardiology',
-    name: 'Cardiology',
-    description: 'Expert cardiac care, ECG diagnostics, hypertension management, heart health screening, and cardiovascular consultations.',
-    icon: 'heart',
-    department: 'Heart Care',
-  },
-  {
-    id: 'gen-lap-surgery',
-    name: 'General & Laparoscopic Surgery',
-    description: 'Minimally invasive laparoscopic procedures, hernia repair, gallbladder surgery, appendectomy, and routine surgical care.',
-    icon: 'stethoscope',
-    department: 'Surgery',
-  },
-  {
-    id: 'pediatrics',
-    name: 'Pediatrics (Child Specialist)',
-    description: 'Dedicated healthcare for infants, toddlers, and adolescents, growth monitoring, and routine childhood immunizations.',
-    icon: 'baby',
-    department: 'Child Health',
-  },
-  {
-    id: 'obs-gyn',
-    name: 'Obstetrics & Gynaecology',
-    description: 'Antenatal and postnatal maternity care, women reproductive health, safe deliveries, and gynecological consultations.',
-    icon: 'heart',
-    department: 'Maternity & Women',
-  },
-  {
-    id: 'radiology-sonology',
-    name: 'Radiology & Sonology',
-    description: 'High-precision diagnostic ultrasound scans, pelvic and abdominal sonography, Doppler imaging, and radiology services.',
-    icon: 'flask',
-    department: 'Diagnostics',
-  },
-  {
-    id: 'breast-lap-surgery',
-    name: 'General, Breast & Laparoscopic Surgery',
-    description: 'Specialized breast surgery, tumor screening, endocrine surgical procedures, and advanced laparoscopic surgeries.',
-    icon: 'stethoscope',
-    department: 'Surgical Oncology',
-  },
-  {
-    id: 'chest-pulmonology',
-    name: 'General & Chest Medicine (Pulmonology)',
-    description: 'Expert treatment for asthma, chronic bronchitis, chest infections, tuberculosis, and respiratory health disorders.',
-    icon: 'stethoscope',
-    department: 'Respiratory Care',
-  },
-  {
-    id: 'diabetology',
-    name: 'Diabetology',
-    description: 'Comprehensive diabetes management, blood glucose regulation, diabetic neuropathy care, and dietary counseling.',
-    icon: 'stethoscope',
-    department: 'Endocrine Care',
-  },
-  {
-    id: 'family-medicine',
-    name: 'Family Medicine',
-    description: 'Holistic primary healthcare services for patients of all ages, preventive health checks, and chronic disease management.',
-    icon: 'stethoscope',
-    department: 'Primary Care',
-  },
-  {
-    id: 'gastroenterology',
-    name: 'Gastroenterology & Hepatology',
-    description: 'Consultations for stomach acidity, liver diseases, hepatitis, peptic ulcers, gallbladder disorders, and digestive health.',
-    icon: 'flask',
-    department: 'Digestive Health',
-  },
-  {
-    id: 'dialysis',
-    name: 'Dialysis',
-    description: 'Hemodialysis support services, renal failure care, kidney function monitoring, and specialized nephrology support.',
-    icon: 'flask',
-    department: 'Renal Care',
-  },
-  {
-    id: 'ent',
-    name: 'ENT',
-    description: 'Ear, nose, and throat consultations, sinus relief, tonsillitis treatment, hearing evaluations, and nasal disorder care.',
-    icon: 'stethoscope',
-    department: 'Ear, Nose & Throat',
-  },
-  {
-    id: 'dental',
-    name: 'Dental',
-    description: 'Comprehensive oral healthcare, dental surgery, tooth extractions, root canal consultations, and preventive dental checkups.',
-    icon: 'stethoscope',
-    department: 'Dental Surgery',
-  },
-];
-
-export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectService }) => {
-  const { t } = useLanguage();
-  const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
-
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'services'));
-        const fetched: Service[] = [];
-        snap.forEach((doc) => {
-          fetched.push({ id: doc.id, ...doc.data() } as Service);
-        });
-        if (fetched.length > 0) {
-          setServices(fetched);
-        }
-      } catch (e) {
-        console.log('Using default services list');
-      }
-    };
-    fetchServices();
-  }, []);
-
-  const getIconComponent = (iconName?: string) => {
-    switch (iconName) {
-      case 'shield-alert':
-        return <ShieldAlert className="w-6 h-6 text-[#D64545]" />;
-      case 'flask':
-        return <FlaskConical className="w-6 h-6 text-[#0B6B4E]" />;
-      case 'pill':
-        return <Pill className="w-6 h-6 text-[#0B6B4E]" />;
-      case 'baby':
-        return <Baby className="w-6 h-6 text-[#0B6B4E]" />;
-      case 'heart':
-        return <HeartHandshake className="w-6 h-6 text-[#0B6B4E]" />;
-      default:
-        return <Stethoscope className="w-6 h-6 text-[#0B6B4E]" />;
-    }
-  };
-
+export const ServicesSection: React.FC<ServicesSectionProps> = () => {
   return (
     <section id="services" className="py-16 bg-[#e8e2d5] text-[#0B6B4E]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
+        <div className="text-center max-w-2xl mx-auto mb-10 space-y-3">
           <span className="bg-emerald-900/10 text-[#0B6B4E] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-            Medical Departments
+            Clinical Care Preview
           </span>
           <h2 className="font-heading font-extrabold text-2xl sm:text-3xl text-[#0B6B4E]">
-            Comprehensive Clinical Services
+            Our Clinical & Medical Services
           </h2>
           <p className="text-xs sm:text-sm text-emerald-950/80">
-            Equipped to deliver high quality medical diagnostics, outpatient consultations, and round-the-clock emergency care.
+            Rafah-E-Aam Medical Centre provides high quality medical diagnostics, general OPD, orthopedic surgery, cardiology, maternity, and round-the-clock emergency care.
           </p>
         </div>
 
-        {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((serv) => (
-            <div
-              key={serv.id}
-              className="bg-[#F5F1E8] p-6 rounded-2xl shadow-sm hover:shadow-md transition-all border border-emerald-900/10 flex flex-col justify-between group"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="p-3 bg-white rounded-xl shadow-xs group-hover:scale-105 transition-transform">
-                    {getIconComponent(serv.icon)}
-                  </div>
-                  {serv.department && (
-                    <span className="text-[11px] font-semibold bg-emerald-900/10 px-2.5 py-0.5 rounded-full text-[#0B6B4E]">
-                      {serv.department}
-                    </span>
-                  )}
-                </div>
-
-                <h3 className="font-heading font-bold text-lg text-[#0B6B4E]">
-                  {serv.name}
-                </h3>
-
-                <p className="text-xs sm:text-sm text-emerald-900/80 leading-relaxed">
-                  {serv.description}
-                </p>
+        {/* Homepage Summary Card for Services */}
+        <div className="bg-[#F5F1E8] rounded-3xl p-8 border border-emerald-900/15 shadow-md max-w-4xl mx-auto space-y-8">
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-emerald-900/10 flex items-center gap-3 shadow-xs">
+              <div className="p-2.5 bg-emerald-100 rounded-xl text-[#0B6B4E]">
+                <Stethoscope className="w-5 h-5" />
               </div>
-
-              <div className="pt-6 mt-4 border-t border-emerald-900/10">
-                <button
-                  onClick={() => onSelectService(serv.id)}
-                  className="w-full bg-[#0B6B4E] hover:bg-[#08523c] text-white py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Calendar className="w-4 h-4" />
-                  <span>Book Appointment</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
-                </button>
+              <div>
+                <div className="font-heading font-bold text-xs sm:text-sm text-[#0B6B4E]">General OPD</div>
+                <div className="text-[11px] text-emerald-800">Adult & Family Medicine</div>
               </div>
             </div>
-          ))}
+
+            <div className="bg-white p-4 rounded-2xl border border-emerald-900/10 flex items-center gap-3 shadow-xs">
+              <div className="p-2.5 bg-red-100 rounded-xl text-[#D64545]">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-heading font-bold text-xs sm:text-sm text-[#0B6B4E]">24/7 Emergency</div>
+                <div className="text-[11px] text-red-700 font-semibold">Trauma & Casualty</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-emerald-900/10 flex items-center gap-3 shadow-xs">
+              <div className="p-2.5 bg-emerald-100 rounded-xl text-[#0B6B4E]">
+                <HeartHandshake className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-heading font-bold text-xs sm:text-sm text-[#0B6B4E]">Orthopedics</div>
+                <div className="text-[11px] text-emerald-800">Bones, Joints & Trauma</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-emerald-900/10 flex items-center gap-3 shadow-xs">
+              <div className="p-2.5 bg-emerald-100 rounded-xl text-[#0B6B4E]">
+                <FlaskConical className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-heading font-bold text-xs sm:text-sm text-[#0B6B4E]">Diagnostics</div>
+                <div className="text-[11px] text-emerald-800">Ultrasound & Lab</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-emerald-900/10 flex items-center gap-3 shadow-xs">
+              <div className="p-2.5 bg-emerald-100 rounded-xl text-[#0B6B4E]">
+                <Baby className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-heading font-bold text-xs sm:text-sm text-[#0B6B4E]">Pediatrics</div>
+                <div className="text-[11px] text-emerald-800">Child & Neonatal Care</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-emerald-900/10 flex items-center gap-3 shadow-xs">
+              <div className="p-2.5 bg-emerald-100 rounded-xl text-[#0B6B4E]">
+                <Stethoscope className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-heading font-bold text-xs sm:text-sm text-[#0B6B4E]">Surgery</div>
+                <div className="text-[11px] text-emerald-800">Laparoscopic & General</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-emerald-900/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs text-emerald-900 font-medium text-center sm:text-left">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Over 15+ specialized medical departments and diagnostic units available.</span>
+            </div>
+
+            <Link
+              to="/services"
+              className="w-full sm:w-auto bg-[#0B6B4E] hover:bg-[#08523c] text-white px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer hover:gap-3"
+            >
+              <span>View All Services</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
         </div>
 
       </div>

@@ -1,60 +1,44 @@
 import React, { useEffect, useState } from 'react';
-import { UserCheck, Calendar, Phone, Award, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Calendar, ArrowRight, Clock } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Doctor } from '../../types';
-import { useLanguage } from '../../context/LanguageContext';
 
 interface DoctorsSectionProps {
   onSelectDoctor: (doctorId: string) => void;
 }
 
-const SAMPLE_DOCTORS: Doctor[] = [
-  { id: 'doc-1', name: 'Dr. Ajmaal Jami', specialty: 'General Physician' },
-  { id: 'doc-2', name: 'Dr. Saqib Zain', specialty: 'General Physician' },
-  { id: 'doc-3', name: 'Dr. Wajid Ali', specialty: 'Consultant Cardiologist & Physician' },
-  { id: 'doc-4', name: 'Dr. S. Kashif Mateen', specialty: 'Consultant General Surgeon & Laparoscopic Surgeon' },
-  { id: 'doc-5', name: 'Dr. Hira', specialty: 'Child Specialist' },
-  { id: 'doc-6', name: 'Dr. S.M. Hussain Hadi Naqvi', specialty: 'Child Specialist' },
-  { id: 'doc-7', name: 'Dr. Saud Abdul Qayyum', specialty: 'Child Specialist' },
-  { id: 'doc-8', name: 'Dr. Amir Hussain', specialty: 'Child Specialist' },
-  { id: 'doc-9', name: 'Dr. Syed Habib Ahmed', specialty: 'Child Specialist' },
-  { id: 'doc-10', name: 'Dr. Ghazala Naseem', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-11', name: 'Dr. Fauzia Ali', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-12', name: 'Dr. Misbah Noreen', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-13', name: 'Dr. Ferheen', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-14', name: 'Dr. Sanawar Pasha', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-15', name: 'Dr. Khurram Zia', specialty: 'Consultant Dental Surgeon' },
-  { id: 'doc-16', name: 'Dr. Syed Saadat Ali', specialty: 'Cardiologist' },
-  { id: 'doc-17', name: 'Dr. Usman Alam', specialty: 'Cardiologist' },
-  { id: 'doc-18', name: 'Dr. Javeriya Qureshi', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-19', name: 'Dr. Shabana Saeed', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-20', name: 'Dr. Gulnaz Ismail', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-21', name: 'Dr. S.M. Shahnawaz', specialty: 'Sonologist & Radiologist' },
+const FEATURED_DOCTORS_FALLBACK: Doctor[] = [
+  { 
+    id: 'doc-3', 
+    name: 'Dr. Wajid Ali', 
+    specialty: 'Consultant Cardiologist & Physician',
+    photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80',
+    availableDays: 'Mon, Wed, Fri',
+    timing: '06:00 PM - 09:00 PM'
+  },
+  { 
+    id: 'doc-4', 
+    name: 'Dr. S. Kashif Mateen', 
+    specialty: 'Consultant General & Laparoscopic Surgeon',
+    photoURL: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=400&q=80',
+    availableDays: 'Tue, Thu, Sat',
+    timing: '05:00 PM - 08:00 PM'
+  },
   { 
     id: 'doc-22', 
     name: 'Dr. Erum Kazim', 
-    specialty: 'General, Breast & Laparoscopic Surgeon', 
-    bio: 'Assistant Professor Surgery, Dow University of Health Sciences & Civil Hospital Karachi' 
+    specialty: 'General, Breast & Laparoscopic Surgeon',
+    bio: 'Assistant Professor Surgery, Dow University of Health Sciences & Civil Hospital Karachi',
+    photoURL: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80',
+    availableDays: 'Mon - Sat',
+    timing: '04:00 PM - 07:00 PM'
   },
-  { id: 'doc-23', name: 'Dr. Mubashir Iqbal', specialty: 'General, Breast & Laparoscopic Surgeon' },
-  { id: 'doc-24', name: 'Dr. Masood', specialty: 'General & Laparoscopic Surgeon' },
-  { id: 'doc-25', name: 'Dr. Akhtar Baig', specialty: 'Orthopedic' },
-  { id: 'doc-26', name: 'Dr. Nadia Adnan', specialty: 'General & Chest Physician' },
-  { id: 'doc-27', name: 'Dr. Syed Ali Talha Raza', specialty: 'General & Chest Physician' },
-  { id: 'doc-28', name: 'Dr. Shakeel Ahmed', specialty: 'Diabetologist' },
-  { id: 'doc-29', name: 'Dr. Qazi Mujahid Ali', specialty: 'Diabetologist' },
-  { id: 'doc-30', name: 'Dr. M. Naseem Akhter', specialty: 'Family Physician' },
-  { id: 'doc-31', name: 'Dr. Suresh Kumar', specialty: 'Gastroenterologist / Hepatologist' },
-  { id: 'doc-32', name: 'Dr. Bushra Rabbani', specialty: 'Consultant General Physician' },
-  { id: 'doc-33', name: 'Dr. Moeen Qureshi', specialty: 'General & Dialysis Specialist' },
-  { id: 'doc-34', name: 'Dr. Asif Ali Abbasi', specialty: 'ENT Specialist' },
 ];
 
 export const DoctorsSection: React.FC<DoctorsSectionProps> = ({ onSelectDoctor }) => {
-  const { t } = useLanguage();
-  const [doctors, setDoctors] = useState<Doctor[]>(SAMPLE_DOCTORS);
-  const [loading, setLoading] = useState(true);
+  const [featuredDoctors, setFeaturedDoctors] = useState<Doctor[]>(FEATURED_DOCTORS_FALLBACK);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -64,16 +48,13 @@ export const DoctorsSection: React.FC<DoctorsSectionProps> = ({ onSelectDoctor }
         snap.forEach((doc) => {
           fetched.push({ id: doc.id, ...doc.data() } as Doctor);
         });
-        if (fetched.length > 0) {
-          setDoctors(fetched);
+        if (fetched.length >= 3) {
+          setFeaturedDoctors(fetched.slice(0, 3));
         }
       } catch (e) {
-        console.warn('Using fallback doctor sample');
-      } finally {
-        setLoading(false);
+        console.warn('Using featured doctors fallback');
       }
     };
-
     fetchDoctors();
   }, []);
 
@@ -83,19 +64,19 @@ export const DoctorsSection: React.FC<DoctorsSectionProps> = ({ onSelectDoctor }
         
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
           <span className="bg-emerald-900/10 text-[#0B6B4E] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-            Specialist Panel
+            Featured Specialist Panel
           </span>
           <h2 className="font-heading font-extrabold text-2xl sm:text-3xl text-[#0B6B4E]">
-            Meet Our Medical Doctors
+            Meet Our Top Medical Consultants
           </h2>
           <p className="text-xs sm:text-sm text-emerald-950/80">
-            Dedicated physicians and consultants committed to compassionate healthcare at Rafah-E-Aam Medical Center.
+            A preview of our senior consultants and surgical specialists. View our full doctor panel to search all 34+ specialists.
           </p>
         </div>
 
-        {/* Doctor Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {doctors.map((doc) => (
+        {/* 3 Featured Doctor Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {featuredDoctors.map((doc) => (
             <div
               key={doc.id}
               className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-emerald-900/10 overflow-hidden flex flex-col justify-between"
@@ -119,24 +100,17 @@ export const DoctorsSection: React.FC<DoctorsSectionProps> = ({ onSelectDoctor }
                   <h3 className="font-heading font-bold text-base text-[#0B6B4E]">
                     {doc.name}
                   </h3>
-                  <div className="text-xs font-semibold text-[#D64545]">
+                  <div className="text-xs font-bold text-[#D64545] bg-red-50 px-2 py-0.5 rounded-md inline-block">
                     {doc.specialty}
                   </div>
                   {doc.bio && (
-                    <p className="text-xs text-emerald-900/70 line-clamp-3 leading-relaxed pt-1">
+                    <p className="text-xs text-emerald-900/70 line-clamp-2 leading-relaxed pt-1">
                       {doc.bio}
                     </p>
                   )}
 
-                  {doc.availableDays && (Array.isArray(doc.availableDays) ? doc.availableDays.length > 0 : Boolean(doc.availableDays)) && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-medium pt-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Days: {Array.isArray(doc.availableDays) ? doc.availableDays.join(', ') : doc.availableDays}</span>
-                    </div>
-                  )}
-
                   {doc.timing && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-medium pt-0.5">
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-medium pt-1">
                       <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span>Timing: {doc.timing}</span>
                     </div>
@@ -147,14 +121,25 @@ export const DoctorsSection: React.FC<DoctorsSectionProps> = ({ onSelectDoctor }
               <div className="p-4 pt-0">
                 <button
                   onClick={() => onSelectDoctor(doc.id)}
-                  className="w-full bg-[#D64545] hover:bg-[#c23737] text-white py-2.5 rounded-xl text-xs font-bold shadow flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="w-full bg-[#D64545] hover:bg-[#c23737] text-white py-2 rounded-xl text-xs font-bold shadow flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Book Visit with Doctor</span>
+                  <span>Book Appointment</span>
                 </button>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* View All Doctors CTA */}
+        <div className="mt-10 text-center">
+          <Link
+            to="/doctors"
+            className="inline-flex items-center gap-2 bg-[#0B6B4E] hover:bg-[#08523c] text-white px-8 py-3.5 rounded-2xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            <span>View All Doctors (34+ Panel)</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
       </div>

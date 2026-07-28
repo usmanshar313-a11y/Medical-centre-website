@@ -30,7 +30,7 @@ export const Footer: React.FC = () => {
                 <h3 className="font-heading font-bold text-lg text-white">
                   Rafah-E-Aam Medical Centre
                 </h3>
-                <p className="text-xs text-emerald-200 font-urdu">رفاہ عام میڈیکل سینٹر</p>
+                <p className="text-xs text-emerald-200">General & Orthopedic Specialist Hospital</p>
               </div>
             </div>
 
@@ -76,29 +76,18 @@ export const Footer: React.FC = () => {
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-sm text-emerald-100">
               <li>
-                <a href="#home" className="hover:text-white transition-colors">Home</a>
+                <Link to="/" className="hover:text-white transition-colors">Home</Link>
               </li>
               <li>
-                <a href="#about" className="hover:text-white transition-colors">About Hospital</a>
+                <Link to="/departments" className="hover:text-white transition-colors">Departments & Doctors</Link>
               </li>
               <li>
-                <a href="#services" className="hover:text-white transition-colors">Medical Services</a>
-              </li>
-              <li>
-                <a href="#doctors" className="hover:text-white transition-colors">Specialist Doctors</a>
-              </li>
-              <li>
-                <a href="#reviews" className="hover:text-white transition-colors">Patient Reviews</a>
+                <Link to="/about" className="hover:text-white transition-colors">About Hospital</Link>
               </li>
               <li>
                 <Link to="/portal" className="hover:text-white transition-colors text-amber-200 font-semibold">
                   Patient Portal →
                 </Link>
-              </li>
-              <li>
-                <a href="admin.html" className="hover:text-white transition-colors text-emerald-200 font-medium">
-                  Staff Admin Portal 🔐
-                </a>
               </li>
             </ul>
           </div>
