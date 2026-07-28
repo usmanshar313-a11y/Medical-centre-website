@@ -96,9 +96,9 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/admin" className="hover:text-white transition-colors text-emerald-200 font-medium">
+                <a href="admin.html" className="hover:text-white transition-colors text-emerald-200 font-medium">
                   Staff Admin Portal 🔐
-                </Link>
+                </a>
               </li>
             </ul>
           </div>
