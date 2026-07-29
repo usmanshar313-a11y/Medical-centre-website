@@ -2,7 +2,6 @@ import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
-import { EmergencyBanner } from './components/common/EmergencyBanner';
 import { Navbar } from './components/common/Navbar';
 import { Footer } from './components/common/Footer';
 import { FloatingWhatsApp } from './components/common/FloatingWhatsApp';
@@ -31,7 +30,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F1E8] text-[#0B6B4E]">
-      <EmergencyBanner />
       <Navbar onOpenBooking={() => setGlobalBookingOpen(true)} />
 
       <main className="flex-1">
@@ -57,6 +55,7 @@ const AppContent: React.FC = () => {
             <Route path="/about.html" element={<AboutPage />} />
             <Route path="/portal/*" element={<PortalPage />} />
             <Route path="/admin/*" element={<AdminApp />} />
+            <Route path="/admin.html" element={<AdminApp />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<NotFoundPage />} />

@@ -734,32 +734,7 @@ export const DepartmentsPage: React.FC = () => {
     <div className="bg-[#F5F1E8] min-h-screen py-10 text-[#0B6B4E]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
-        {/* Page Banner Header */}
-        <div className="bg-[#0B6B4E] text-white p-8 sm:p-10 rounded-3xl shadow-lg border border-emerald-800 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl text-center md:text-left">
-            <span className="bg-emerald-800 text-amber-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              Rafah-E-Aam Medical Centre
-            </span>
-            <h1 className="font-heading font-extrabold text-3xl sm:text-4xl text-white">
-              Medical Departments & Doctor Panel
-            </h1>
-            <p className="text-xs sm:text-sm text-emerald-100 leading-relaxed">
-              Explore our clinical departments, assigned doctor panels, available days, OPD timings, and consultation fees. Book direct appointments with senior consultants.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-center md:items-end gap-2 bg-emerald-900/60 p-4 rounded-2xl border border-emerald-600/50 shrink-0 w-full md:w-auto text-center md:text-right">
-            <div className="text-2xl font-extrabold text-amber-300">15+ Departments</div>
-            <div className="text-xs text-emerald-100 font-semibold">34+ Authorized Specialist Doctors</div>
-            <a
-              href="tel:+922136342011"
-              className="mt-2 bg-[#D64545] hover:bg-[#c23737] text-white px-4 py-2 rounded-xl text-xs font-bold shadow flex items-center justify-center gap-1.5 transition-colors"
-            >
-              <PhoneCall className="w-3.5 h-3.5" /> Call Reception (+92 21 36342011)
-            </a>
-          </div>
-        </div>
+    
 
         {/* Filter & Search Bar */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">

@@ -29,7 +29,8 @@ import {
   MessageSquare,
   Smartphone,
   MailCheck,
-  BellRing
+  BellRing,
+  Download
 } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
@@ -779,6 +780,45 @@ export const AdminApp: React.FC = () => {
     return matchesStatus && matchesSearch;
   });
 
+  // Export Appointments to CSV (client-side download via Blob)
+  const handleExportCSV = () => {
+    const dataToExport = filteredAppointments.length > 0 ? filteredAppointments : appointments;
+    if (dataToExport.length === 0) {
+      alert('No appointment records available to export.');
+      return;
+    }
+
+    const headers = ['Patient Name', 'Phone', 'Email', 'Department / Service', 'Doctor', 'Preferred Date', 'Preferred Time', 'Status'];
+
+    const escapeCsv = (str?: string) => {
+      if (!str) return '""';
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const rows = dataToExport.map((a) => [
+      escapeCsv(a.patientName),
+      escapeCsv(a.phone),
+      escapeCsv(a.email || 'N/A'),
+      escapeCsv(a.service),
+      escapeCsv(a.doctorName || 'Duty Specialist'),
+      escapeCsv(a.preferredDate),
+      escapeCsv(a.preferredTime),
+      escapeCsv(a.status)
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `appointments_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Today's appointments count
   const todayStr = new Date().toISOString().split('T')[0];
   const apptsToday = appointments.filter((a) => a.preferredDate === todayStr).length;
@@ -960,6 +1000,16 @@ export const AdminApp: React.FC = () => {
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
+
+                {/* Export CSV Button */}
+                <button
+                  onClick={handleExportCSV}
+                  className="bg-[#0B6B4E] hover:bg-[#08523c] text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0"
+                  title="Export appointments list to downloadable CSV"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export to CSV</span>
+                </button>
               </div>
             </div>
 

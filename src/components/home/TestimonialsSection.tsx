@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Star, MessageSquarePlus, CheckCircle2, User, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Star, MessageSquarePlus, CheckCircle2, X } from 'lucide-react';
 import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Review } from '../../types';
@@ -87,23 +88,29 @@ export const TestimonialsSection: React.FC = () => {
   };
 
   return (
-    <section id="reviews" className="py-16 bg-[#e8e2d5] text-[#0B6B4E]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="reviews" className="py-20 bg-[#e8e2d5] text-[#0B6B4E]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
-          <div>
-            <span className="bg-emerald-900/10 text-[#0B6B4E] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6"
+        >
+          <div className="space-y-2">
+            <span className="bg-emerald-900/10 text-[#0B6B4E] text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider">
               Patient Experiences
             </span>
-            <h2 className="font-heading font-extrabold text-2xl sm:text-3xl text-[#0B6B4E] mt-2">
+            <h2 className="font-heading font-extrabold text-2xl sm:text-3xl lg:text-4xl text-[#0B6B4E]">
               Trusted by 200+ Patients in Karachi
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-950/80 mt-1">
+            <p className="text-xs sm:text-sm text-emerald-950/80 max-w-xl">
               Read authentic feedback from families and patients treated at Rafah-E-Aam Medical Center.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             <a
               href="https://www.google.com/maps?q=Rafah-E-Aam+Medical+Center+Karachi"
               target="_blank"
@@ -119,20 +126,24 @@ export const TestimonialsSection: React.FC = () => {
                 setModalOpen(true);
                 setSubmitted(false);
               }}
-              className="bg-[#0B6B4E] hover:bg-[#08523c] text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow flex items-center gap-2 transition-colors cursor-pointer"
+              className="bg-[#0B6B4E] hover:bg-[#08523c] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow flex items-center gap-2 transition-colors cursor-pointer"
             >
               <MessageSquarePlus className="w-4 h-4" />
               <span>Write a Review</span>
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Reviews Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {reviews.map((rev) => (
-            <div
+          {reviews.map((rev, idx) => (
+            <motion.div
               key={rev.id}
-              className="bg-[#F5F1E8] p-6 rounded-2xl border border-emerald-900/10 shadow-xs flex flex-col justify-between space-y-4"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-30px" }}
+              transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              className="bg-[#F5F1E8] p-6 rounded-3xl border border-emerald-900/10 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -141,7 +152,7 @@ export const TestimonialsSection: React.FC = () => {
                       <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                     ))}
                   </div>
-                  <span className="text-[11px] text-emerald-800/60">
+                  <span className="text-[11px] text-emerald-800/60 font-medium">
                     {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString() : 'Verified Patient'}
                   </span>
                 </div>
@@ -151,16 +162,16 @@ export const TestimonialsSection: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5 pt-3 border-t border-emerald-900/10">
-                <div className="w-8 h-8 rounded-full bg-[#0B6B4E] text-white flex items-center justify-center text-xs font-bold">
+              <div className="flex items-center gap-3 pt-3 border-t border-emerald-900/10">
+                <div className="w-9 h-9 rounded-full bg-[#0B6B4E] text-white flex items-center justify-center text-xs font-bold shrink-0">
                   {rev.patientName.charAt(0)}
                 </div>
                 <div>
-                  <div className="font-bold text-xs text-[#0B6B4E]">{rev.patientName}</div>
-                  <div className="text-[10px] text-emerald-800/70">Verified Patient</div>
+                  <div className="font-bold text-xs sm:text-sm text-[#0B6B4E]">{rev.patientName}</div>
+                  <div className="text-[10px] text-emerald-800/70 font-medium">Verified Patient</div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 
