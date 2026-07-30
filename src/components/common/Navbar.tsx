@@ -95,6 +95,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
             >
               Contact
             </button>
+            <Link 
+              to="/admin.html" 
+              className="hover:text-amber-200 transition-colors cursor-pointer py-1 text-emerald-100 font-semibold"
+            >
+              Admin
+            </Link>
           </nav>
 
           {/* User Auth & Booking CTA -> Far Right */}

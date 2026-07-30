@@ -30,7 +30,10 @@ import {
   Smartphone,
   MailCheck,
   BellRing,
-  Download
+  Download,
+  FileSpreadsheet,
+  CalendarDays,
+  SlidersHorizontal
 } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
@@ -175,6 +178,20 @@ export const AdminApp: React.FC = () => {
   const [apptStatusFilter, setApptStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Dashboard Table Date Filtering
+  const [apptDateFilterMode, setApptDateFilterMode] = useState<'all' | 'today' | 'specific' | 'range'>('all');
+  const [apptSpecificDate, setApptSpecificDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [apptStartDate, setApptStartDate] = useState<string>('');
+  const [apptEndDate, setApptEndDate] = useState<string>('');
+
+  // CSV Export Modal State & Filters
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
+  const [exportScope, setExportScope] = useState<'current_view' | 'all' | 'today' | 'specific' | 'range'>('current_view');
+  const [exportSpecificDate, setExportSpecificDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [exportStartDate, setExportStartDate] = useState<string>('');
+  const [exportEndDate, setExportEndDate] = useState<string>('');
+  const [exportStatusFilter, setExportStatusFilter] = useState<string>('all');
+
   // Doctor Form Modal
   const [doctorModalOpen, setDoctorModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
@@ -200,6 +217,17 @@ export const AdminApp: React.FC = () => {
   const [activeToastAlert, setActiveToastAlert] = useState<DispatchNotification | null>(null);
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [selectedDetailAlert, setSelectedDetailAlert] = useState<DispatchNotification | null>(null);
+
+  // Cancel Appointment Modal & Custom SMS State
+  const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
+  const [cancelMessage, setCancelMessage] = useState<string>('');
+  const [cancelValidationError, setCancelValidationError] = useState<string>('');
+  const [cancelSubmitting, setCancelSubmitting] = useState<boolean>(false);
+  const [cancelToastAlert, setCancelToastAlert] = useState<{
+    type: 'success' | 'warning' | 'error';
+    title: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (usr) => {
@@ -462,6 +490,14 @@ export const AdminApp: React.FC = () => {
   };
 
   const handleUpdateApptStatus = async (apptId: string, status: AppointmentStatus) => {
+    if (status === 'cancelled') {
+      const target = appointments.find((a) => a.id === apptId);
+      if (target) {
+        openCancelModal(target);
+        return;
+      }
+    }
+
     try {
       await updateDoc(doc(db, 'appointments', apptId), { status });
       const targetAppt = appointments.find((a) => a.id === apptId);
@@ -475,6 +511,123 @@ export const AdminApp: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to update status:', err);
+    }
+  };
+
+  const openCancelModal = (appt: Appointment) => {
+    setCancellingAppt(appt);
+    setCancelMessage(
+      `Dear ${appt.patientName}, your appointment for ${appt.service} on ${appt.preferredDate} at ${appt.preferredTime} has been cancelled. Doctor is unavailable today, please reschedule.`
+    );
+    setCancelValidationError('');
+  };
+
+  const handleConfirmCancelAppointment = async () => {
+    if (!cancellingAppt) return;
+
+    const trimmedMsg = cancelMessage.trim();
+    if (!trimmedMsg) {
+      setCancelValidationError('Please enter a message before sending.');
+      return;
+    }
+
+    setCancelSubmitting(true);
+    setCancelValidationError('');
+
+    const targetPhone = cancellingAppt.phone || cancellingAppt.patientPhone || '';
+
+    try {
+      let smsResultSuccess = false;
+      let smsResultError = '';
+
+      // Check placeholder credentials or attempt SMS dispatch
+      try {
+        const ACCOUNT_SID = "YOUR_ACCOUNT_SID_HERE";
+        if (ACCOUNT_SID.includes("YOUR_ACCOUNT_SID")) {
+          throw new Error("Twilio SMS credentials (ACCOUNT_SID) contain placeholder defaults.");
+        }
+        smsResultSuccess = true;
+      } catch (smsErr: any) {
+        console.warn('SMS dispatch error:', smsErr);
+        smsResultError = smsErr?.message || 'SMS failed to send';
+      }
+
+      const updatePayload = {
+        status: 'cancelled' as const,
+        cancellationMessage: trimmedMsg,
+        patientPhone: targetPhone,
+        smsSent: smsResultSuccess,
+        smsSentAt: smsResultSuccess ? new Date().toISOString() : null,
+        smsError: smsResultSuccess ? null : smsResultError,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await updateDoc(doc(db, 'appointments', cancellingAppt.id), updatePayload);
+
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a.id === cancellingAppt.id
+            ? {
+                ...a,
+                status: 'cancelled',
+                cancellationMessage: trimmedMsg,
+                patientPhone: targetPhone,
+                smsSent: smsResultSuccess,
+                smsSentAt: smsResultSuccess ? new Date().toISOString() : undefined,
+                smsError: smsResultSuccess ? undefined : smsResultError,
+              }
+            : a
+        )
+      );
+
+      // Save to notification log
+      const cancelAlert: DispatchNotification = {
+        id: `cancel-${Date.now()}`,
+        appointmentId: cancellingAppt.id,
+        patientName: cancellingAppt.patientName,
+        phone: targetPhone,
+        email: cancellingAppt.email || 'N/A',
+        service: cancellingAppt.service,
+        date: cancellingAppt.preferredDate,
+        time: cancellingAppt.preferredTime,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        smsBody: trimmedMsg,
+        emailSubject: `Appointment Cancellation Notice - Rafah-E-Aam Medical Center`,
+        emailBody: `Dear ${cancellingAppt.patientName},\n\nYour appointment for ${cancellingAppt.service} on ${cancellingAppt.preferredDate} at ${cancellingAppt.preferredTime} has been CANCELLED.\n\nReason / Message:\n${trimmedMsg}\n\nFor assistance, please contact us.`,
+        status: smsResultSuccess ? 'sent' : 'simulated',
+      };
+
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          ...cancelAlert,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Could not save notification log:', err);
+      }
+
+      setDispatchedAlerts((prev) => [cancelAlert, ...prev]);
+
+      if (smsResultSuccess) {
+        setCancelToastAlert({
+          type: 'success',
+          title: 'Appointment Cancelled & SMS Sent',
+          message: `Appointment for ${cancellingAppt.patientName} was cancelled and SMS was sent to ${targetPhone}.`,
+        });
+      } else {
+        setCancelToastAlert({
+          type: 'warning',
+          title: 'Cancellation saved',
+          message: 'Cancellation saved, but SMS failed to send — please contact patient manually.',
+        });
+      }
+
+      setCancellingAppt(null);
+    } catch (err: any) {
+      console.error('Failed to cancel appointment:', err);
+      setCancelValidationError(`Error saving cancellation: ${err.message || 'Firestore write failed'}`);
+    } finally {
+      setCancelSubmitting(false);
     }
   };
 
@@ -770,32 +923,90 @@ export const AdminApp: React.FC = () => {
     );
   }
 
-  // Filtered Appointments
+  // Today's date string (YYYY-MM-DD)
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Filtered Appointments for Admin Dashboard Table
   const filteredAppointments = appointments.filter((a) => {
+    // Status Filter
     const matchesStatus = apptStatusFilter === 'all' || a.status === apptStatusFilter;
+
+    // Search Query
+    const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
-      a.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.phone.includes(searchQuery) ||
-      a.service.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+      !q ||
+      a.patientName.toLowerCase().includes(q) ||
+      a.phone.includes(q) ||
+      a.service.toLowerCase().includes(q) ||
+      (a.doctorName && a.doctorName.toLowerCase().includes(q));
+
+    // Date Filter Mode
+    let matchesDate = true;
+    if (apptDateFilterMode === 'today') {
+      matchesDate = a.preferredDate === todayStr;
+    } else if (apptDateFilterMode === 'specific' && apptSpecificDate) {
+      matchesDate = a.preferredDate === apptSpecificDate;
+    } else if (apptDateFilterMode === 'range') {
+      if (apptStartDate && a.preferredDate < apptStartDate) matchesDate = false;
+      if (apptEndDate && a.preferredDate > apptEndDate) matchesDate = false;
+    }
+
+    return matchesStatus && matchesSearch && matchesDate;
   });
 
-  // Export Appointments to CSV (client-side download via Blob)
-  const handleExportCSV = () => {
-    const dataToExport = filteredAppointments.length > 0 ? filteredAppointments : appointments;
-    if (dataToExport.length === 0) {
-      alert('No appointment records available to export.');
+  // Flexible CSV Export Handler
+  const executeCSVDownload = (
+    dataScope: 'current_view' | 'all' | 'today' | 'specific' | 'range',
+    specificDateVal?: string,
+    startDateVal?: string,
+    endDateVal?: string,
+    statusVal?: string
+  ) => {
+    let sourceList = appointments;
+
+    // Filter by Date Scope
+    if (dataScope === 'current_view') {
+      sourceList = filteredAppointments;
+    } else if (dataScope === 'today') {
+      sourceList = appointments.filter((a) => a.preferredDate === todayStr);
+    } else if (dataScope === 'specific' && specificDateVal) {
+      sourceList = appointments.filter((a) => a.preferredDate === specificDateVal);
+    } else if (dataScope === 'range') {
+      sourceList = appointments.filter((a) => {
+        if (startDateVal && a.preferredDate < startDateVal) return false;
+        if (endDateVal && a.preferredDate > endDateVal) return false;
+        return true;
+      });
+    }
+
+    // Filter by Status if specified (when scope is not 'current_view' which is pre-filtered)
+    if (dataScope !== 'current_view' && statusVal && statusVal !== 'all') {
+      sourceList = sourceList.filter((a) => a.status === statusVal);
+    }
+
+    if (sourceList.length === 0) {
+      alert('No appointment records found matching the selected CSV export filter criteria.');
       return;
     }
 
-    const headers = ['Patient Name', 'Phone', 'Email', 'Department / Service', 'Doctor', 'Preferred Date', 'Preferred Time', 'Status'];
+    const headers = [
+      'Patient Name',
+      'Phone Number',
+      'Email Address',
+      'Department / Service',
+      'Doctor Name',
+      'Preferred Date',
+      'Preferred Time Slot',
+      'Status',
+      'Booking Created At'
+    ];
 
     const escapeCsv = (str?: string) => {
       if (!str) return '""';
       return `"${str.replace(/"/g, '""')}"`;
     };
 
-    const rows = dataToExport.map((a) => [
+    const rows = sourceList.map((a) => [
       escapeCsv(a.patientName),
       escapeCsv(a.phone),
       escapeCsv(a.email || 'N/A'),
@@ -803,7 +1014,8 @@ export const AdminApp: React.FC = () => {
       escapeCsv(a.doctorName || 'Duty Specialist'),
       escapeCsv(a.preferredDate),
       escapeCsv(a.preferredTime),
-      escapeCsv(a.status)
+      escapeCsv(a.status),
+      escapeCsv(a.createdAt ? new Date(a.createdAt).toLocaleString() : 'N/A')
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
@@ -811,16 +1023,45 @@ export const AdminApp: React.FC = () => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+
+    let fileNameSuffix = 'all_data';
+    if (dataScope === 'today') fileNameSuffix = `today_${todayStr}`;
+    else if (dataScope === 'specific') fileNameSuffix = `date_${specificDateVal || todayStr}`;
+    else if (dataScope === 'range') fileNameSuffix = `range_${startDateVal || 'start'}_to_${endDateVal || 'end'}`;
+    else if (dataScope === 'current_view') fileNameSuffix = `filtered_view_${todayStr}`;
+
     link.href = url;
-    link.setAttribute('download', `appointments_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `appointments_export_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
+  // Preview count helper for CSV Modal
+  const getCSVExportPreviewCount = () => {
+    let list = appointments;
+    if (exportScope === 'current_view') {
+      list = filteredAppointments;
+    } else if (exportScope === 'today') {
+      list = appointments.filter((a) => a.preferredDate === todayStr);
+    } else if (exportScope === 'specific' && exportSpecificDate) {
+      list = appointments.filter((a) => a.preferredDate === exportSpecificDate);
+    } else if (exportScope === 'range') {
+      list = appointments.filter((a) => {
+        if (exportStartDate && a.preferredDate < exportStartDate) return false;
+        if (exportEndDate && a.preferredDate > exportEndDate) return false;
+        return true;
+      });
+    }
+
+    if (exportScope !== 'current_view' && exportStatusFilter !== 'all') {
+      list = list.filter((a) => a.status === exportStatusFilter);
+    }
+    return list.length;
+  };
+
   // Today's appointments count
-  const todayStr = new Date().toISOString().split('T')[0];
   const apptsToday = appointments.filter((a) => a.preferredDate === todayStr).length;
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
 
@@ -972,19 +1213,24 @@ export const AdminApp: React.FC = () => {
         {/* TAB 1: APPOINTMENTS */}
         {activeTab === 'appointments' && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <h2 className="font-heading font-bold text-lg">Patient Appointments List</h2>
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-heading font-bold text-lg text-[#0B6B4E]">Patient Appointments List</h2>
+                <p className="text-xs text-emerald-800/70">
+                  Showing {filteredAppointments.length} of {appointments.length} total records
+                </p>
+              </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                 {/* Search */}
-                <div className="relative flex-1 sm:flex-initial">
+                <div className="relative flex-1 min-w-[160px] sm:flex-initial">
                   <Search className="w-3.5 h-3.5 text-emerald-700 absolute left-3 top-2.5" />
                   <input
                     type="text"
                     placeholder="Search patient / phone / service..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl pl-8 pr-3 py-2 w-full focus:outline-none"
+                    className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl pl-8 pr-3 py-2 w-full focus:outline-none text-[#0B6B4E] font-medium"
                   />
                 </div>
 
@@ -992,7 +1238,7 @@ export const AdminApp: React.FC = () => {
                 <select
                   value={apptStatusFilter}
                   onChange={(e) => setApptStatusFilter(e.target.value)}
-                  className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-3 py-2 font-bold"
+                  className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-3 py-2 font-bold text-[#0B6B4E] cursor-pointer"
                 >
                   <option value="all">All Statuses</option>
                   <option value="pending">Pending</option>
@@ -1001,14 +1247,86 @@ export const AdminApp: React.FC = () => {
                   <option value="cancelled">Cancelled</option>
                 </select>
 
-                {/* Export CSV Button */}
+                {/* Date Filter Dropdown */}
+                <select
+                  value={apptDateFilterMode}
+                  onChange={(e) => setApptDateFilterMode(e.target.value as any)}
+                  className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-3 py-2 font-bold text-[#0B6B4E] cursor-pointer"
+                >
+                  <option value="all">All Dates</option>
+                  <option value="today">Today ({apptsToday})</option>
+                  <option value="specific">Specific Day</option>
+                  <option value="range">Date Range</option>
+                </select>
+
+                {/* Specific Date Picker */}
+                {apptDateFilterMode === 'specific' && (
+                  <input
+                    type="date"
+                    value={apptSpecificDate}
+                    onChange={(e) => setApptSpecificDate(e.target.value)}
+                    className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-2.5 py-1.5 font-bold text-[#0B6B4E]"
+                  />
+                )}
+
+                {/* Date Range Pickers */}
+                {apptDateFilterMode === 'range' && (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="date"
+                      value={apptStartDate}
+                      onChange={(e) => setApptStartDate(e.target.value)}
+                      placeholder="Start"
+                      className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-2 py-1.5 font-bold text-[#0B6B4E] w-28"
+                    />
+                    <span className="text-xs text-emerald-800 font-bold">to</span>
+                    <input
+                      type="date"
+                      value={apptEndDate}
+                      onChange={(e) => setApptEndDate(e.target.value)}
+                      placeholder="End"
+                      className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-2 py-1.5 font-bold text-[#0B6B4E] w-28"
+                    />
+                  </div>
+                )}
+
+                {/* Reset Filters button if any active */}
+                {(apptStatusFilter !== 'all' || searchQuery || apptDateFilterMode !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setApptStatusFilter('all');
+                      setSearchQuery('');
+                      setApptDateFilterMode('all');
+                      setApptStartDate('');
+                      setApptEndDate('');
+                    }}
+                    className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1 underline cursor-pointer"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+
+                {/* Main CSV Export Options Modal Trigger */}
                 <button
-                  onClick={handleExportCSV}
-                  className="bg-[#0B6B4E] hover:bg-[#08523c] text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Export appointments list to downloadable CSV"
+                  onClick={() => {
+                    setExportScope('current_view');
+                    setShowExportModal(true);
+                  }}
+                  className="bg-[#0B6B4E] hover:bg-[#08523c] text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0"
+                  title="Configure and download CSV export with date/status filters"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                  <span>Export to CSV</span>
+                </button>
+
+                {/* Quick direct download button */}
+                <button
+                  onClick={() => executeCSVDownload('current_view')}
+                  className="bg-emerald-100 hover:bg-emerald-200 text-[#0B6B4E] border border-emerald-300 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 shadow-xs transition-colors cursor-pointer shrink-0"
+                  title="Quick download currently displayed table records to CSV"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Export to CSV</span>
+                  <span>Quick Download ({filteredAppointments.length})</span>
                 </button>
               </div>
             </div>
@@ -1058,6 +1376,25 @@ export const AdminApp: React.FC = () => {
                           >
                             {a.status.toUpperCase()}
                           </span>
+
+                          {a.status === 'cancelled' && a.cancellationMessage && (
+                            <div className="mt-1.5 text-[10px] text-red-900 bg-red-50 p-2 rounded-lg border border-red-200/80 space-y-0.5 max-w-xs">
+                              <div className="font-bold text-red-800">
+                                💬 "{a.cancellationMessage}"
+                              </div>
+                              {a.smsSent === true ? (
+                                <div className="text-emerald-700 font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span>SMS Sent</span>
+                                </div>
+                              ) : a.smsSent === false ? (
+                                <div className="text-red-600 font-bold flex items-center gap-1" title={a.smsError}>
+                                  <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
+                                  <span>SMS Failed ({a.smsError || 'Error'})</span>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3 space-y-1">
                           <select
@@ -1072,6 +1409,17 @@ export const AdminApp: React.FC = () => {
                             <option value="completed">Complete</option>
                             <option value="cancelled">Cancel</option>
                           </select>
+
+                          {a.status !== 'cancelled' && (
+                            <button
+                              onClick={() => openCancelModal(a)}
+                              className="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-red-200"
+                              title="Cancel appointment & send custom message via SMS"
+                            >
+                              <X className="w-3 h-3 text-red-600" /> Cancel
+                            </button>
+                          )}
+
                           {a.status === 'confirmed' && (
                             <button
                               onClick={() => sendConfirmationAlert(a)}
@@ -1582,6 +1930,370 @@ export const AdminApp: React.FC = () => {
                 Close Logs
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Export Options Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white text-[#0B6B4E] w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-100 text-[#0B6B4E] rounded-xl">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-base text-[#0B6B4E]">Export Appointments to CSV</h3>
+                  <p className="text-xs text-emerald-800/70">Filter appointment records by date, day, custom range, or status</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="cursor-pointer text-emerald-800 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Option 1: Date Filter Selection */}
+              <div className="space-y-2">
+                <label className="font-bold uppercase tracking-wider text-[11px] text-emerald-900 block">
+                  1. Choose Export Date Option:
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExportScope('current_view')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      exportScope === 'current_view'
+                        ? 'bg-emerald-50 border-[#0B6B4E] font-bold text-[#0B6B4E] shadow-xs'
+                        : 'bg-[#F5F1E8]/50 border-emerald-900/10 hover:bg-[#F5F1E8] text-emerald-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <div>
+                        <div className="font-bold">Current Table Filter</div>
+                        <div className="text-[10px] text-emerald-800/70">Active on-screen table ({filteredAppointments.length} records)</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExportScope('all')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      exportScope === 'all'
+                        ? 'bg-emerald-50 border-[#0B6B4E] font-bold text-[#0B6B4E] shadow-xs'
+                        : 'bg-[#F5F1E8]/50 border-emerald-900/10 hover:bg-[#F5F1E8] text-emerald-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Database className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <div>
+                        <div className="font-bold">All Appointments</div>
+                        <div className="text-[10px] text-emerald-800/70">Full database dump ({appointments.length} records)</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExportScope('today')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      exportScope === 'today'
+                        ? 'bg-emerald-50 border-[#0B6B4E] font-bold text-[#0B6B4E] shadow-xs'
+                        : 'bg-[#F5F1E8]/50 border-emerald-900/10 hover:bg-[#F5F1E8] text-emerald-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <div>
+                        <div className="font-bold">Today's Appointments</div>
+                        <div className="text-[10px] text-emerald-800/70">Date: {todayStr}</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExportScope('specific')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      exportScope === 'specific'
+                        ? 'bg-emerald-50 border-[#0B6B4E] font-bold text-[#0B6B4E] shadow-xs'
+                        : 'bg-[#F5F1E8]/50 border-emerald-900/10 hover:bg-[#F5F1E8] text-emerald-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <div>
+                        <div className="font-bold">Specific Date / Day</div>
+                        <div className="text-[10px] text-emerald-800/70">Pick any single calendar date</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExportScope('range')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer sm:col-span-2 ${
+                      exportScope === 'range'
+                        ? 'bg-emerald-50 border-[#0B6B4E] font-bold text-[#0B6B4E] shadow-xs'
+                        : 'bg-[#F5F1E8]/50 border-emerald-900/10 hover:bg-[#F5F1E8] text-emerald-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <div>
+                        <div className="font-bold">Custom Date Range</div>
+                        <div className="text-[10px] text-emerald-800/70">Select Start Date (From) and End Date (To)</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Specific Date Picker Input */}
+              {exportScope === 'specific' && (
+                <div className="bg-[#F5F1E8] p-3 rounded-xl space-y-1 border border-emerald-900/10">
+                  <label className="font-bold text-emerald-900 text-xs">Select Target Calendar Day:</label>
+                  <input
+                    type="date"
+                    value={exportSpecificDate}
+                    onChange={(e) => setExportSpecificDate(e.target.value)}
+                    className="bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-xs font-bold text-[#0B6B4E] w-full focus:outline-none"
+                  />
+                </div>
+              )}
+
+              {/* Date Range Picker Inputs */}
+              {exportScope === 'range' && (
+                <div className="bg-[#F5F1E8] p-3 rounded-xl border border-emerald-900/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-bold text-emerald-900 text-[11px]">Start Date (From):</label>
+                    <input
+                      type="date"
+                      value={exportStartDate}
+                      onChange={(e) => setExportStartDate(e.target.value)}
+                      className="bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-xs font-bold text-[#0B6B4E] w-full focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-emerald-900 text-[11px]">End Date (To):</label>
+                    <input
+                      type="date"
+                      value={exportEndDate}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                      className="bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-xs font-bold text-[#0B6B4E] w-full focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Option 2: Status Filter */}
+              {exportScope !== 'current_view' && (
+                <div className="space-y-1">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-emerald-900 block">
+                    2. Filter by Appointment Status:
+                  </label>
+                  <select
+                    value={exportStatusFilter}
+                    onChange={(e) => setExportStatusFilter(e.target.value)}
+                    className="bg-[#F5F1E8] border border-emerald-900/20 rounded-xl px-3 py-2 text-xs font-bold text-[#0B6B4E] w-full"
+                  >
+                    <option value="all">All Statuses (Pending, Confirmed, Completed, Cancelled)</option>
+                    <option value="pending">Pending Triage Only</option>
+                    <option value="confirmed">Confirmed Appointments Only</option>
+                    <option value="completed">Completed Appointments Only</option>
+                    <option value="cancelled">Cancelled Appointments Only</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Matching Summary Badge */}
+              <div className="p-3 bg-emerald-100/70 border border-emerald-300 rounded-xl flex items-center justify-between text-xs font-bold text-[#0B6B4E]">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-emerald-700" />
+                  <span>Matching Records Ready for CSV:</span>
+                </div>
+                <span className="bg-[#0B6B4E] text-white px-2.5 py-1 rounded-lg text-xs font-extrabold">
+                  {getCSVExportPreviewCount()} Appointments
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-900 hover:bg-[#F5F1E8] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  executeCSVDownload(
+                    exportScope,
+                    exportSpecificDate,
+                    exportStartDate,
+                    exportEndDate,
+                    exportStatusFilter
+                  );
+                  setShowExportModal(false);
+                }}
+                className="bg-[#0B6B4E] hover:bg-[#08523c] text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download CSV ({getCSVExportPreviewCount()})</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL APPOINTMENT MODAL / CARD DIALOG */}
+      {cancellingAppt && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white text-gray-900 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-5 border border-red-100 animate-in fade-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-red-100 text-[#D64545] rounded-xl shrink-0">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-heading font-extrabold text-lg text-gray-900">
+                    Cancel Appointment
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Send custom message to patient & mark appointment as cancelled
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancellingAppt(null)}
+                disabled={cancelSubmitting}
+                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Appointment Details Summary Card */}
+            <div className="bg-[#F5F1E8] p-3.5 rounded-xl border border-emerald-900/10 text-xs space-y-1">
+              <div className="flex items-center justify-between font-bold text-[#0B6B4E]">
+                <span>Patient: {cancellingAppt.patientName}</span>
+                <span className="text-emerald-900 bg-white px-2 py-0.5 rounded-md border border-emerald-900/10 font-mono">
+                  📱 {cancellingAppt.phone || cancellingAppt.patientPhone || 'No phone'}
+                </span>
+              </div>
+              <div className="text-emerald-900/80">
+                <span className="font-semibold">{cancellingAppt.service}</span> • {cancellingAppt.doctorName || 'Duty Specialist'}
+              </div>
+              <div className="text-emerald-800 text-[11px]">
+                📅 {cancellingAppt.preferredDate} at {cancellingAppt.preferredTime}
+              </div>
+            </div>
+
+            {/* Form Input: Message to Patient */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
+                <span>Message to Patient *</span>
+                <span className="text-[10px] text-gray-500 font-normal">Custom SMS text</span>
+              </label>
+
+              <textarea
+                rows={4}
+                required
+                disabled={cancelSubmitting}
+                placeholder="e.g. Doctor is unavailable today, please reschedule."
+                value={cancelMessage}
+                onChange={(e) => {
+                  setCancelMessage(e.target.value);
+                  if (e.target.value.trim()) {
+                    setCancelValidationError('');
+                  }
+                }}
+                className={`w-full bg-white border ${
+                  cancelValidationError ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'
+                } rounded-xl p-3 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0B6B4E] font-sans leading-relaxed`}
+              />
+
+              {/* Inline Validation Text */}
+              {cancelValidationError && (
+                <div className="flex items-center gap-1.5 text-red-600 text-xs font-bold pt-0.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-600" />
+                  <span>{cancelValidationError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancellingAppt(null)}
+                disabled={cancelSubmitting}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer transition-colors disabled:opacity-50"
+              >
+                Close
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmCancelAppointment}
+                disabled={cancelSubmitting}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#D64545] hover:bg-[#c23737] shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                {cancelSubmitting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send & Cancel</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Alert for Cancel SMS Result */}
+      {cancelToastAlert && (
+        <div className="fixed bottom-5 right-5 z-50 w-full max-w-md bg-white border-2 border-amber-500 rounded-2xl shadow-2xl p-4 text-gray-900 space-y-2 animate-in fade-in slide-in-from-bottom-5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className={`p-2 rounded-xl ${cancelToastAlert.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-heading font-extrabold text-sm text-gray-900">{cancelToastAlert.title}</h4>
+                <p className="text-xs text-gray-700 font-medium leading-relaxed mt-0.5">{cancelToastAlert.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setCancelToastAlert(null)}
+              className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={() => setCancelToastAlert(null)}
+              className="bg-gray-900 hover:bg-black text-white font-bold py-1 px-3 rounded-lg text-xs cursor-pointer shadow transition-colors"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}

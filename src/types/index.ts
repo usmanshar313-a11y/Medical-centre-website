@@ -17,6 +17,7 @@ export interface Appointment {
   patientId: string;
   patientName: string;
   phone: string;
+  patientPhone?: string;
   email: string;
   service: string;
   doctorId?: string;
@@ -26,6 +27,10 @@ export interface Appointment {
   reason?: string;
   status: AppointmentStatus;
   notes?: string;
+  cancellationMessage?: string;
+  smsSent?: boolean;
+  smsSentAt?: string;
+  smsError?: string;
   source: string;
   createdAt: string;
 }

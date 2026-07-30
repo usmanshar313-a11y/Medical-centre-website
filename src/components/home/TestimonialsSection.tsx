@@ -88,7 +88,7 @@ export const TestimonialsSection: React.FC = () => {
   };
 
   return (
-    <section id="reviews" className="py-20 bg-[#e8e2d5] text-[#0B6B4E]">
+    <section id="reviews" className="py-20 bg-[#e8e2d5] text-[#0B6B4E] gsap-reveal">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         
         <motion.div 

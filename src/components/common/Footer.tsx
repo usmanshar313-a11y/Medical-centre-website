@@ -89,6 +89,11 @@ export const Footer: React.FC = () => {
                   Patient Portal →
                 </Link>
               </li>
+              <li>
+                <Link to="/admin.html" className="hover:text-white transition-colors text-emerald-200 font-medium">
+                  Admin Portal →
+                </Link>
+              </li>
             </ul>
           </div>
 

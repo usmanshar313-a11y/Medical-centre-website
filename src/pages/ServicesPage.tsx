@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   Stethoscope, 
   ShieldAlert, 
@@ -16,8 +16,10 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Service } from '../types';
 import { BookingModal } from '../components/booking/BookingModal';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
 const DEFAULT_SERVICES: Service[] = [
+
   {
     id: 'gen-physician',
     name: 'General Physician',
@@ -126,11 +128,14 @@ const DEFAULT_SERVICES: Service[] = [
 ];
 
 export const ServicesPage: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState<string>('All');
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string | undefined>(undefined);
+
+  useScrollAnimation(containerRef, '.gsap-reveal');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -185,11 +190,11 @@ export const ServicesPage: React.FC = () => {
   });
 
   return (
-    <div className="bg-[#F5F1E8] min-h-screen py-10 text-[#0B6B4E]">
+    <div ref={containerRef} className="bg-[#F5F1E8] min-h-screen py-10 text-[#0B6B4E]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         
         {/* Page Header */}
-        <div className="bg-[#0B6B4E] text-white p-8 rounded-3xl shadow-lg border border-emerald-800 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-[#0B6B4E] text-white p-8 rounded-3xl shadow-lg border border-emerald-800 flex flex-col md:flex-row items-center justify-between gap-6 gsap-reveal">
           <div className="space-y-3 max-w-2xl text-center md:text-left">
             <span className="bg-emerald-800 text-amber-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block">
               Rafah-E-Aam Medical Departments
@@ -245,7 +250,7 @@ export const ServicesPage: React.FC = () => {
 
         {/* Services Grid */}
         {filteredServices.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl text-center space-y-3 border border-emerald-900/10">
+          <div className="bg-white p-12 rounded-2xl text-center space-y-3 border border-emerald-900/10 gsap-reveal">
             <p className="font-heading font-bold text-lg text-emerald-900">No matching services found</p>
             <p className="text-xs text-emerald-700">Try searching for a different service name or department.</p>
             <button
@@ -256,7 +261,7 @@ export const ServicesPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 gsap-reveal">
             {filteredServices.map((serv) => (
               <div
                 key={serv.id}

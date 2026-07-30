@@ -25,7 +25,13 @@ const AppContent: React.FC = () => {
   const [globalBookingOpen, setGlobalBookingOpen] = useState(false);
   const location = useLocation();
 
-  // Hide WhatsApp on standalone admin or special routes if needed
+  React.useEffect(() => {
+    const handleOpen = () => setGlobalBookingOpen(true);
+    window.addEventListener('open-booking-modal', handleOpen);
+    return () => window.removeEventListener('open-booking-modal', handleOpen);
+  }, []);
+
+  // Hide WhatsApp & Booking floating buttons on standalone admin route
   const isHideWhatsApp = location.pathname.startsWith('/admin');
 
   return (
@@ -65,7 +71,7 @@ const AppContent: React.FC = () => {
 
       <Footer />
 
-      {!isHideWhatsApp && <FloatingWhatsApp />}
+      {!isHideWhatsApp && <FloatingWhatsApp onOpenBooking={() => setGlobalBookingOpen(true)} />}
 
       <BookingModal
         isOpen={globalBookingOpen}

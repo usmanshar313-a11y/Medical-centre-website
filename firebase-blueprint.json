@@ -32,6 +32,11 @@
         "preferredTime": { "type": "string" },
         "reason": { "type": "string" },
         "status": { "type": "string" },
+        "cancellationMessage": { "type": "string" },
+        "patientPhone": { "type": "string" },
+        "smsSent": { "type": "boolean" },
+        "smsSentAt": { "type": "string" },
+        "smsError": { "type": "string" },
         "notes": { "type": "string" },
         "source": { "type": "string" },
         "createdAt": { "type": "string" }

@@ -51,7 +51,7 @@ export const DepartmentsSection: React.FC<DepartmentsSectionProps> = () => {
   ];
 
   return (
-    <section id="departments" className="py-20 bg-[#e8e2d5] text-[#0B6B4E]">
+    <section id="departments" className="py-20 bg-[#e8e2d5] text-[#0B6B4E] gsap-reveal">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         
         {/* Section Header */}
@@ -92,7 +92,7 @@ export const DepartmentsSection: React.FC<DepartmentsSectionProps> = () => {
                     <div className={`p-3.5 rounded-2xl ${dept.bg} group-hover:scale-105 transition-transform`}>
                       <Icon className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-extrabold text-[#D64545] bg-red-50 border border-red-100 px-3 py-1 rounded-full shadow-2xs">
+                    <span className="text-xs font-extrabold text-[#0B6B4E] bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
                       Fee: {dept.fee}
                     </span>
                   </div>

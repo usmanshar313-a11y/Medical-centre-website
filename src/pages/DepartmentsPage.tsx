@@ -844,7 +844,7 @@ export const DepartmentsPage: React.FC = () => {
                       </span>
                     )}
                     {dept.fee && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-300 text-[#0B6B4E] text-xs font-bold shadow-xs max-w-full">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100/90 text-[#0B6B4E] border border-emerald-300 text-xs font-bold shadow-xs max-w-full">
                         <Banknote className="w-3.5 h-3.5 text-[#0B6B4E] shrink-0" />
                         <span className="truncate">Fee: {dept.fee}</span>
                       </span>
@@ -931,7 +931,7 @@ export const DepartmentsPage: React.FC = () => {
                                   <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
                                   <span>Consultation Fee:</span>
                                 </div>
-                                <span className="font-extrabold text-[#D64545] bg-red-50 px-2 py-0.5 rounded-md shrink-0">
+                                <span className="font-extrabold text-[#0B6B4E] bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md shrink-0">
                                   {doc.fee || dept.fee || 'Rs. 1,000'}
                                 </span>
                               </div>
