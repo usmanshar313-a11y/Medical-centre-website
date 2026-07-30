@@ -162,9 +162,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
               </button>
             )}
 
-            {/* Red Primary CTA */}
+            {/* Red Primary CTA -> Navigates to Departments & Doctors */}
             <button
-              onClick={onOpenBooking}
+              onClick={() => {
+                navigate('/departments');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="bg-[#D64545] hover:bg-[#c23737] active:bg-[#b02e2e] text-white px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0"
             >
               <Calendar className="w-4 h-4" />
@@ -255,7 +258,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
-                onOpenBooking();
+                navigate('/departments');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="w-full bg-[#D64545] hover:bg-[#c23737] text-white py-3 rounded-xl text-sm font-bold shadow flex items-center justify-center gap-2 mt-2"
             >

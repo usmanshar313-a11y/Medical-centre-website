@@ -11,13 +11,15 @@ import {
   MessageSquare,
   Lock,
   AlertTriangle,
-  LogIn
+  LogIn,
+  MapPin
 } from 'lucide-react';
 import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Doctor, Service } from '../../types';
+import { ALL_DOCTORS, DEFAULT_SERVICES } from '../../data/departmentsData';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -25,61 +27,6 @@ interface BookingModalProps {
   preselectedDoctorId?: string;
   preselectedServiceId?: string;
 }
-
-const DEFAULT_SERVICES: Service[] = [
-  { id: 'gen-physician', name: 'General Physician', description: 'Comprehensive adult outpatient consultations & health checkups' },
-  { id: 'orthopedics', name: 'Orthopedic Surgery', description: 'Bone, joint, fracture & spinal care consultations' },
-  { id: 'cardiology', name: 'Cardiology', description: 'Consultant cardiac care & heart health diagnostics' },
-  { id: 'gen-lap-surgery', name: 'General & Laparoscopic Surgery', description: 'Minimally invasive laparoscopic & surgical procedures' },
-  { id: 'pediatrics', name: 'Pediatrics (Child Specialist)', description: 'Childhood healthcare, growth monitoring & vaccinations' },
-  { id: 'obs-gyn', name: 'Obstetrics & Gynaecology', description: 'Antenatal, postnatal maternity care & women health' },
-  { id: 'radiology-sonology', name: 'Radiology & Sonology', description: 'Ultrasound scans, sonography & diagnostic radiology' },
-  { id: 'breast-lap-surgery', name: 'General, Breast & Laparoscopic Surgery', description: 'Specialized breast surgery & laparoscopic procedures' },
-  { id: 'chest-pulmonology', name: 'General & Chest Medicine (Pulmonology)', description: 'Respiratory care, asthma, chest infection & lung care' },
-  { id: 'diabetology', name: 'Diabetology', description: 'Diabetes control, blood sugar regulation & counseling' },
-  { id: 'family-medicine', name: 'Family Medicine', description: 'Holistic primary care for all family members' },
-  { id: 'gastroenterology', name: 'Gastroenterology & Hepatology', description: 'Liver, stomach acidity, digestive & intestinal health' },
-  { id: 'dialysis', name: 'Dialysis', description: 'Hemodialysis support services & renal care' },
-  { id: 'ent', name: 'ENT', description: 'Ear, nose, throat & sinus treatment' },
-  { id: 'dental', name: 'Dental', description: 'Dental surgery, oral hygiene & preventive dental care' },
-];
-
-const DEFAULT_DOCTORS: Doctor[] = [
-  { id: 'doc-1', name: 'Dr. Ajmaal Jami', specialty: 'General Physician' },
-  { id: 'doc-2', name: 'Dr. Saqib Zain', specialty: 'General Physician' },
-  { id: 'doc-3', name: 'Dr. Wajid Ali', specialty: 'Consultant Cardiologist & Physician' },
-  { id: 'doc-4', name: 'Dr. S. Kashif Mateen', specialty: 'Consultant General Surgeon & Laparoscopic Surgeon' },
-  { id: 'doc-5', name: 'Dr. Hira', specialty: 'Child Specialist' },
-  { id: 'doc-6', name: 'Dr. S.M. Hussain Hadi Naqvi', specialty: 'Child Specialist' },
-  { id: 'doc-7', name: 'Dr. Saud Abdul Qayyum', specialty: 'Child Specialist' },
-  { id: 'doc-8', name: 'Dr. Amir Hussain', specialty: 'Child Specialist' },
-  { id: 'doc-9', name: 'Dr. Syed Habib Ahmed', specialty: 'Child Specialist' },
-  { id: 'doc-10', name: 'Dr. Ghazala Naseem', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-11', name: 'Dr. Fauzia Ali', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-12', name: 'Dr. Misbah Noreen', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-13', name: 'Dr. Ferheen', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-14', name: 'Dr. Sanawar Pasha', specialty: 'Obstetrics & Gynaecologist' },
-  { id: 'doc-15', name: 'Dr. Khurram Zia', specialty: 'Consultant Dental Surgeon' },
-  { id: 'doc-16', name: 'Dr. Syed Saadat Ali', specialty: 'Cardiologist' },
-  { id: 'doc-17', name: 'Dr. Usman Alam', specialty: 'Cardiologist' },
-  { id: 'doc-18', name: 'Dr. Javeriya Qureshi', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-19', name: 'Dr. Shabana Saeed', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-20', name: 'Dr. Gulnaz Ismail', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-21', name: 'Dr. S.M. Shahnawaz', specialty: 'Sonologist & Radiologist' },
-  { id: 'doc-22', name: 'Dr. Erum Kazim', specialty: 'General, Breast & Laparoscopic Surgeon' },
-  { id: 'doc-23', name: 'Dr. Mubashir Iqbal', specialty: 'General, Breast & Laparoscopic Surgeon' },
-  { id: 'doc-24', name: 'Dr. Masood', specialty: 'General & Laparoscopic Surgeon' },
-  { id: 'doc-25', name: 'Dr. Akhtar Baig', specialty: 'Orthopedic' },
-  { id: 'doc-26', name: 'Dr. Nadia Adnan', specialty: 'General & Chest Physician' },
-  { id: 'doc-27', name: 'Dr. Syed Ali Talha Raza', specialty: 'General & Chest Physician' },
-  { id: 'doc-28', name: 'Dr. Shakeel Ahmed', specialty: 'Diabetologist' },
-  { id: 'doc-29', name: 'Dr. Qazi Mujahid Ali', specialty: 'Diabetologist' },
-  { id: 'doc-30', name: 'Dr. M. Naseem Akhter', specialty: 'Family Physician' },
-  { id: 'doc-31', name: 'Dr. Suresh Kumar', specialty: 'Gastroenterologist / Hepatologist' },
-  { id: 'doc-32', name: 'Dr. Bushra Rabbani', specialty: 'Consultant General Physician' },
-  { id: 'doc-33', name: 'Dr. Moeen Qureshi', specialty: 'General & Dialysis Specialist' },
-  { id: 'doc-34', name: 'Dr. Asif Ali Abbasi', specialty: 'ENT Specialist' },
-];
 
 export const BookingModal: React.FC<BookingModalProps> = ({
   isOpen,
@@ -90,17 +37,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const { user, patientProfile, signInWithGoogle } = useAuth();
   const { t } = useLanguage();
 
-  const [doctors, setDoctors] = useState<Doctor[]>(DEFAULT_DOCTORS);
+  const [doctors, setDoctors] = useState<Doctor[]>(ALL_DOCTORS);
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
 
   // Form state
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [gender, setGender] = useState<'Male' | 'Female'>('Male');
   const [service, setService] = useState('');
   const [doctorId, setDoctorId] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
-  const [preferredTime, setPreferredTime] = useState('09:00 AM');
   const [reason, setReason] = useState('');
   const [isReturning, setIsReturning] = useState(false);
 
@@ -147,7 +95,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       const docSnap = await getDocs(collection(db, 'doctors'));
       const fetchedDocs: Doctor[] = [];
       docSnap.forEach((d) => fetchedDocs.push({ id: d.id, ...d.data() } as Doctor));
-      if (fetchedDocs.length > 0) setDoctors(fetchedDocs);
+      if (fetchedDocs.length > 0) {
+        const mergedDocs = fetchedDocs.map((fd) => {
+          const fallbackDoc = ALL_DOCTORS.find((d) => d.id === fd.id);
+          return {
+            ...fallbackDoc,
+            ...fd,
+            photoURL: fd.photoURL || fallbackDoc?.photoURL,
+          };
+        });
+        setDoctors(mergedDocs);
+      }
 
       // Services
       const servSnap = await getDocs(collection(db, 'services'));
@@ -204,8 +162,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    if (!name || !phone || !preferredDate || !preferredTime || (!service && !doctorId)) {
-      setErrorMsg('Please fill in all required fields (Name, Phone, Date, Time, and Service).');
+    if (!name || !phone || !preferredDate || (!service && !doctorId)) {
+      setErrorMsg('Please fill in all required fields (Name, Phone, Date, and Service/Doctor).');
       return;
     }
 
@@ -221,11 +179,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         patientName: name,
         phone,
         email,
+        address,
+        gender,
         service: selectedServ,
         doctorId: doctorId || '',
         doctorName: selectedDoc ? selectedDoc.name : 'Duty Specialist',
         preferredDate,
-        preferredTime,
         reason,
         status: 'pending',
         isReturning,
@@ -304,7 +263,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const filteredDoctors = getFilteredDoctors();
 
   const whatsappLink = `https://wa.me/922136342011?text=${encodeURIComponent(
-    `Hello Rafah-E-Aam Medical Centre, I booked an appointment request on your website for ${name} (${phone}) on ${preferredDate} at ${preferredTime}. Please confirm my slot.`
+    `Hello Rafah-E-Aam Medical Centre, I booked an appointment request on your website for ${name} (${phone}) on ${preferredDate}. Please confirm my slot.`
   )}`;
 
   return (
@@ -344,7 +303,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
               <p className="text-sm text-emerald-900/80 max-w-md mx-auto leading-relaxed">
                 Thank you <span className="font-semibold">{name}</span>. Your request for{' '}
-                <span className="font-semibold">{preferredDate} at {preferredTime}</span> has been logged. Our reception team will call you at <span className="font-semibold">{phone}</span> to confirm.
+                <span className="font-semibold">{preferredDate}</span> has been logged. Our reception team will call you at <span className="font-semibold">{phone}</span> to confirm.
               </p>
 
               <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -369,6 +328,41 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               
+              {/* Doctor Profile Confirmation Header (Displayed when a doctor is selected) */}
+              {(() => {
+                const activeDoc = doctors.find((d) => d.id === doctorId);
+                if (!activeDoc) return null;
+                return (
+                  <div className="bg-gradient-to-br from-emerald-50 via-[#F5F1E8] to-emerald-100/60 p-4 rounded-2xl border border-emerald-300/60 text-center space-y-2 mb-2 shadow-xs">
+                    <div className="relative inline-block">
+                      <img
+                        src={activeDoc.photoURL || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80'}
+                        alt={activeDoc.name}
+                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover object-top border-4 border-white shadow-md mx-auto"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
+                        }}
+                      />
+                      <span className="absolute bottom-1 right-1 bg-[#0B6B4E] text-white p-1 rounded-full shadow-sm">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider">Appointment Selected With</div>
+                      <h4 className="font-heading font-extrabold text-lg sm:text-xl text-[#0B6B4E]">{activeDoc.name}</h4>
+                      <span className="text-xs sm:text-sm font-bold text-[#D64545] bg-red-50 border border-red-200/60 px-2.5 py-0.5 rounded-md inline-block mt-1">
+                        {activeDoc.specialty}
+                      </span>
+                      {activeDoc.roomNumber && (
+                        <div className="text-xs text-emerald-800 font-semibold mt-1">
+                          Location: <span className="font-bold text-[#0B6B4E]">{activeDoc.roomNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Login Requirement Banner */}
               {!user ? (
                 <div className="bg-amber-50 border border-amber-300 p-4 rounded-2xl space-y-2">
@@ -398,109 +392,126 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               )}
 
               {errorMsg && (
-                <div className="p-3 bg-red-100 border border-red-300 text-red-700 text-xs rounded-xl font-medium flex items-center gap-2">
+                <div className="p-3 bg-red-100 border border-red-300 text-red-700 text-xs sm:text-sm rounded-xl font-medium flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
+              {/* Patient Name & Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Patient Name */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
                     {t.fullName} *
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-emerald-700 absolute left-3 top-3" />
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 absolute left-3 top-3.5" />
                     <input
                       type="text"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Muhammad Ali"
-                      className="w-full bg-white border border-emerald-900/20 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                      className="w-full bg-white border border-emerald-900/20 rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
                     />
                   </div>
                 </div>
 
-                {/* Phone */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
                     {t.phoneNumber} *
                   </label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-emerald-700 absolute left-3 top-3" />
+                    <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 absolute left-3 top-3.5" />
                     <input
                       type="tel"
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+92 300 1234567"
-                      className="w-full bg-white border border-emerald-900/20 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                      className="w-full bg-white border border-emerald-900/20 rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
                     />
                   </div>
                 </div>
               </div>
 
+              {/* Email & Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Email */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
                     {t.emailAddress}
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-emerald-700 absolute left-3 top-3" />
+                    <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 absolute left-3 top-3.5" />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="patient@example.com"
-                      className="w-full bg-white border border-emerald-900/20 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                      className="w-full bg-white border border-emerald-900/20 rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
                     />
                   </div>
                 </div>
 
-                {/* Patient Type */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
-                    Patient Visit Type
+                  <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
+                    Gender *
                   </label>
-                  <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-emerald-900/20 text-xs font-medium">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
+                  <div className="flex items-center gap-6 bg-white p-2.5 sm:p-3 rounded-xl border border-emerald-900/20 text-sm font-semibold">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="radio"
-                        name="returning"
-                        checked={!isReturning}
-                        onChange={() => setIsReturning(false)}
-                        className="accent-[#0B6B4E]"
+                        name="gender"
+                        value="Male"
+                        checked={gender === 'Male'}
+                        onChange={() => setGender('Male')}
+                        className="w-4 h-4 accent-[#0B6B4E] cursor-pointer"
                       />
-                      New Patient
+                      <span>Male</span>
                     </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="radio"
-                        name="returning"
-                        checked={isReturning}
-                        onChange={() => setIsReturning(true)}
-                        className="accent-[#0B6B4E]"
+                        name="gender"
+                        value="Female"
+                        checked={gender === 'Female'}
+                        onChange={() => setGender('Female')}
+                        className="w-4 h-4 accent-[#0B6B4E] cursor-pointer"
                       />
-                      Follow-up / Returning
+                      <span>Female</span>
                     </label>
                   </div>
                 </div>
               </div>
 
+              {/* Address Field */}
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
+                  Residential Address
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 absolute left-3 top-3.5" />
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="e.g. House #123, Block 13, Gulberg Town, Karachi"
+                    className="w-full bg-white border border-emerald-900/20 rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                  />
+                </div>
+              </div>
+
               {/* Service / Department */}
               <div>
-                <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
+                <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
                   {t.selectService} *
                 </label>
                 <div className="relative">
-                  <Stethoscope className="w-4 h-4 text-emerald-700 absolute left-3 top-3" />
+                  <Stethoscope className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 absolute left-3 top-3.5" />
                   <select
                     value={service}
                     onChange={(e) => setService(e.target.value)}
-                    className="w-full bg-white border border-emerald-900/20 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                    className="w-full bg-white border border-emerald-900/20 rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
                   >
                     <option value="">-- Choose Department / Care --</option>
                     {services.map((s) => (
@@ -512,29 +523,28 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               </div>
 
-              {/* Preferred Doctor */}
-              <div>
-                <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
-                  {t.selectDoctor}
-                </label>
-                <select
-                  value={doctorId}
-                  onChange={(e) => setDoctorId(e.target.value)}
-                  className="w-full bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
-                >
-                  <option value="">-- Any Available Specialist / Duty Doctor ({filteredDoctors.length} available) --</option>
-                  {filteredDoctors.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({d.specialty})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+              {/* Preferred Doctor & Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Date */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
+                    {t.selectDoctor}
+                  </label>
+                  <select
+                    value={doctorId}
+                    onChange={(e) => setDoctorId(e.target.value)}
+                    className="w-full bg-white border border-emerald-900/20 rounded-xl px-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                  >
+                    <option value="">-- Any Available Specialist ({filteredDoctors.length} available) --</option>
+                    {filteredDoctors.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.specialty})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-[#0B6B4E] mb-1.5">
                     {t.preferredDate} *
                   </label>
                   <input
@@ -543,27 +553,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     min={new Date().toISOString().split('T')[0]}
                     value={preferredDate}
                     onChange={(e) => setPreferredDate(e.target.value)}
-                    className="w-full bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                    className="w-full bg-white border border-emerald-900/20 rounded-xl px-3.5 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
                   />
-                </div>
-
-                {/* Time Slot */}
-                <div>
-                  <label className="block text-xs font-bold text-[#0B6B4E] mb-1">
-                    {t.preferredTime} *
-                  </label>
-                  <select
-                    value={preferredTime}
-                    onChange={(e) => setPreferredTime(e.target.value)}
-                    className="w-full bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
-                  >
-                    <option value="09:00 AM">09:00 AM - Morning</option>
-                    <option value="11:00 AM">11:00 AM - Morning</option>
-                    <option value="02:00 PM">02:00 PM - Afternoon</option>
-                    <option value="05:00 PM">05:00 PM - Evening</option>
-                    <option value="08:00 PM">08:00 PM - Night Care</option>
-                    <option value="Emergency Any Time">24/7 Emergency Immediate</option>
-                  </select>
                 </div>
               </div>
 

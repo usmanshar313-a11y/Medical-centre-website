@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
@@ -17,11 +18,12 @@ import heroReceptionImg from '../../assets/images/hero_reception_1785393482596.j
 const HERO_BACKGROUND_IMAGE = heroReceptionImg;
 
 interface HeroProps {
-  onOpenBooking: () => void;
+  onOpenBooking?: () => void;
 }
 
-export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
+export const Hero: React.FC<HeroProps> = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   return (
     <section id="home" className="relative min-h-[520px] lg:min-h-[580px] flex items-center pt-12 pb-20 lg:py-28 overflow-hidden text-white">
@@ -62,7 +64,10 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
           {/* Action Buttons */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
             <button
-              onClick={onOpenBooking}
+              onClick={() => {
+                navigate('/departments');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="w-full sm:w-auto bg-[#D64545] hover:bg-[#c23737] text-white px-8 py-3.5 rounded-full text-base font-bold shadow-xl shadow-black/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Calendar className="w-5 h-5" />

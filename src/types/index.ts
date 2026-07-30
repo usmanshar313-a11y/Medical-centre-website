@@ -19,11 +19,13 @@ export interface Appointment {
   phone: string;
   patientPhone?: string;
   email: string;
+  address?: string;
+  gender?: string;
   service: string;
   doctorId?: string;
   doctorName?: string;
   preferredDate: string;
-  preferredTime: string;
+  preferredTime?: string;
   reason?: string;
   status: AppointmentStatus;
   notes?: string;

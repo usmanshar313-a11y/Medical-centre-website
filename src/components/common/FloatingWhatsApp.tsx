@@ -1,21 +1,21 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar } from 'lucide-react';
 
 interface FloatingActionsProps {
   onOpenBooking?: () => void;
 }
 
-export const FloatingWhatsApp: React.FC<FloatingActionsProps> = ({ onOpenBooking }) => {
+export const FloatingWhatsApp: React.FC<FloatingActionsProps> = () => {
+  const navigate = useNavigate();
+
   const whatsappUrl = `https://wa.me/922136342011?text=${encodeURIComponent(
     "Hi, I'd like to book an appointment at Rafah-E-Aam Medical Center (رفاہ عام میڈیکل سینٹر)"
   )}`;
 
   const handleBookingClick = () => {
-    if (onOpenBooking) {
-      onOpenBooking();
-    } else {
-      window.dispatchEvent(new CustomEvent('open-booking-modal'));
-    }
+    navigate('/departments');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (

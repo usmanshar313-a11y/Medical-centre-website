@@ -203,11 +203,20 @@ export const AdminApp: React.FC = () => {
   const [docDays, setDocDays] = useState('');
   const [docRoom, setDocRoom] = useState('');
 
-  // Patient Report Upload Modal
+  // Patient Report Upload Modal & Deletion Selection State
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [reportFileName, setReportFileName] = useState('');
   const [reportFileUrl, setReportFileUrl] = useState('');
   const [reportUploadSuccess, setReportUploadSuccess] = useState('');
+
+  // Patient Manual Selection & Deletion State
+  const [selectedPatientUids, setSelectedPatientUids] = useState<string[]>([]);
+  const [patientSearchQuery, setPatientSearchQuery] = useState<string>('');
+  const [deletingPatients, setDeletingPatients] = useState<boolean>(false);
+
+  // Appointment Manual Selection & Deletion State
+  const [selectedApptIds, setSelectedApptIds] = useState<string[]>([]);
+  const [deletingAppts, setDeletingAppts] = useState<boolean>(false);
 
   // Seed Status Notification
   const [seedSuccessMsg, setSeedSuccessMsg] = useState('');
@@ -711,6 +720,137 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Patient Selection & Deletion Logic
+  const handleToggleSelectPatient = (uid: string) => {
+    setSelectedPatientUids((prev) =>
+      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
+    );
+  };
+
+  const handleSelectAllPatients = (targetList: Patient[]) => {
+    const targetUids = targetList.map((p) => p.uid);
+    const allSelected = targetUids.length > 0 && targetUids.every((uid) => selectedPatientUids.includes(uid));
+
+    if (allSelected) {
+      setSelectedPatientUids((prev) => prev.filter((uid) => !targetUids.includes(uid)));
+    } else {
+      const newUids = Array.from(new Set([...selectedPatientUids, ...targetUids]));
+      setSelectedPatientUids(newUids);
+    }
+  };
+
+  const handleDeleteSinglePatient = async (p: Patient) => {
+    if (!window.confirm(`Are you sure you want to delete the patient record for "${p.name}"?`)) return;
+
+    setDeletingPatients(true);
+    try {
+      await deleteDoc(doc(db, 'patients', p.uid));
+      setPatients((prev) => prev.filter((item) => item.uid !== p.uid));
+      setSelectedPatientUids((prev) => prev.filter((id) => id !== p.uid));
+      if (selectedPatient?.uid === p.uid) {
+        setSelectedPatient(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete patient:', err);
+      alert('Failed to delete patient record from database.');
+    } finally {
+      setDeletingPatients(false);
+    }
+  };
+
+  const handleDeleteSelectedPatients = async () => {
+    if (selectedPatientUids.length === 0) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the ${selectedPatientUids.length} selected patient profile(s)? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingPatients(true);
+    try {
+      const deletePromises = selectedPatientUids.map((uid) => deleteDoc(doc(db, 'patients', uid)));
+      await Promise.all(deletePromises);
+
+      setPatients((prev) => prev.filter((p) => !selectedPatientUids.includes(p.uid)));
+      if (selectedPatient && selectedPatientUids.includes(selectedPatient.uid)) {
+        setSelectedPatient(null);
+      }
+      setSelectedPatientUids([]);
+    } catch (err) {
+      console.error('Failed to delete selected patients:', err);
+      alert('Failed to delete selected patient records.');
+    } finally {
+      setDeletingPatients(false);
+    }
+  };
+
+  const handleDeleteAllPatients = async () => {
+    if (patients.length === 0) return;
+    const confirmed = window.confirm(
+      `⚠️ CRITICAL WARNING: Are you sure you want to delete ALL ${patients.length} patient profiles from the database?\n\nThis will permanently delete every patient record. This action CANNOT be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingPatients(true);
+    try {
+      const deletePromises = patients.map((p) => deleteDoc(doc(db, 'patients', p.uid)));
+      await Promise.all(deletePromises);
+
+      setPatients([]);
+      setSelectedPatient(null);
+      setSelectedPatientUids([]);
+    } catch (err) {
+      console.error('Failed to delete all patients:', err);
+      alert('Failed to delete all patient records.');
+    } finally {
+      setDeletingPatients(false);
+    }
+  };
+
+  // Appointment Selection & Deletion Logic
+  const handleToggleSelectAppt = (id: string) => {
+    setSelectedApptIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllAppts = (targetList: Appointment[]) => {
+    const targetIds = targetList.map((a) => a.id);
+    const allSelected = targetIds.length > 0 && targetIds.every((id) => selectedApptIds.includes(id));
+
+    if (allSelected) {
+      setSelectedApptIds((prev) => prev.filter((id) => !targetIds.includes(id)));
+    } else {
+      const newIds = Array.from(new Set([...selectedApptIds, ...targetIds]));
+      setSelectedApptIds(newIds);
+    }
+  };
+
+  const handleDeleteSelectedAppts = async () => {
+    if (selectedApptIds.length === 0) return;
+    const count = selectedApptIds.length;
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete ${count} appointment(s)? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingAppts(true);
+    try {
+      const deletePromises = selectedApptIds.map((id) => deleteDoc(doc(db, 'appointments', id)));
+      await Promise.all(deletePromises);
+
+      setAppointments((prev) => prev.filter((a) => !selectedApptIds.includes(a.id)));
+      setSelectedApptIds([]);
+    } catch (err) {
+      console.error('Failed to delete selected appointments:', err);
+      alert('Failed to delete selected appointment records.');
+    } finally {
+      setDeletingAppts(false);
+    }
+  };
+
   // Seed Initial Demo Data Function
   const seedDemoData = async () => {
     if (!window.confirm('Seed default Doctors, Services, and Reviews into Firestore database?')) return;
@@ -952,6 +1092,17 @@ export const AdminApp: React.FC = () => {
     }
 
     return matchesStatus && matchesSearch && matchesDate;
+  });
+
+  // Filtered Patients for Admin Patient Directory
+  const filteredPatientsList = patients.filter((p) => {
+    const q = patientSearchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.email && p.email.toLowerCase().includes(q)) ||
+      (p.phone && p.phone.toLowerCase().includes(q))
+    );
   });
 
   // Flexible CSV Export Handler
@@ -1319,14 +1470,16 @@ export const AdminApp: React.FC = () => {
                   <span>Export to CSV</span>
                 </button>
 
-                {/* Quick direct download button */}
+                {/* Delete Selected Appointments Button */}
                 <button
-                  onClick={() => executeCSVDownload('current_view')}
-                  className="bg-emerald-100 hover:bg-emerald-200 text-[#0B6B4E] border border-emerald-300 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Quick download currently displayed table records to CSV"
+                  type="button"
+                  disabled={selectedApptIds.length === 0 || deletingAppts}
+                  onClick={handleDeleteSelectedAppts}
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={selectedApptIds.length === 0 ? "Select appointments to delete" : `Delete ${selectedApptIds.length} selected appointment(s)`}
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Quick Download ({filteredAppointments.length})</span>
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete ({selectedApptIds.length})</span>
                 </button>
               </div>
             </div>
@@ -1340,7 +1493,19 @@ export const AdminApp: React.FC = () => {
                 <table className="w-full text-left text-xs text-emerald-950">
                   <thead className="bg-[#F5F1E8] text-[#0B6B4E] font-bold uppercase text-[10px]">
                     <tr>
-                      <th className="p-3 rounded-l-xl">Patient</th>
+                      <th className="p-3 rounded-l-xl w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={
+                            filteredAppointments.length > 0 &&
+                            filteredAppointments.every((a) => selectedApptIds.includes(a.id))
+                          }
+                          onChange={() => handleSelectAllAppts(filteredAppointments)}
+                          className="w-4 h-4 accent-[#0B6B4E] rounded cursor-pointer"
+                          title="Select / Deselect All Visible Appointments"
+                        />
+                      </th>
+                      <th className="p-3">Patient</th>
                       <th className="p-3">Service & Doctor</th>
                       <th className="p-3">Date & Time</th>
                       <th className="p-3">Status</th>
@@ -1348,90 +1513,96 @@ export const AdminApp: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-emerald-900/10">
-                    {filteredAppointments.map((a) => (
-                      <tr key={a.id} className="hover:bg-emerald-50/50">
-                        <td className="p-3 font-semibold">
-                          <div>{a.patientName}</div>
-                          <div className="text-[10px] text-emerald-800">{a.phone} • {a.email || 'No email'}</div>
-                        </td>
-                        <td className="p-3">
-                          <div className="font-bold">{a.service}</div>
-                          <div className="text-[10px] text-emerald-800">{a.doctorName || 'Duty Specialist'}</div>
-                        </td>
-                        <td className="p-3">
-                          <div className="font-bold">{a.preferredDate}</div>
-                          <div className="text-[10px] text-emerald-800">{a.preferredTime}</div>
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              a.status === 'confirmed'
-                                ? 'bg-emerald-100 text-[#0B6B4E]'
-                                : a.status === 'completed'
-                                ? 'bg-blue-100 text-blue-800'
-                                : a.status === 'cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {a.status.toUpperCase()}
-                          </span>
+                    {filteredAppointments.map((a) => {
+                      const isApptChecked = selectedApptIds.includes(a.id);
+                      return (
+                        <tr
+                          key={a.id}
+                          className={`hover:bg-emerald-50/50 transition-colors ${
+                            isApptChecked ? 'bg-red-50/50' : ''
+                          }`}
+                        >
+                          <td className="p-3 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isApptChecked}
+                              onChange={() => handleToggleSelectAppt(a.id)}
+                              className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-3 font-semibold">
+                            <div>{a.patientName}</div>
+                            <div className="text-[10px] text-emerald-800">{a.phone} • {a.email || 'No email'}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold">{a.service}</div>
+                            <div className="text-[10px] text-emerald-800">{a.doctorName || 'Duty Specialist'}</div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold">{a.preferredDate}</div>
+                            <div className="text-[10px] text-emerald-800">{a.preferredTime}</div>
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                a.status === 'confirmed'
+                                  ? 'bg-emerald-100 text-[#0B6B4E]'
+                                  : a.status === 'completed'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : a.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {a.status.toUpperCase()}
+                            </span>
 
-                          {a.status === 'cancelled' && a.cancellationMessage && (
-                            <div className="mt-1.5 text-[10px] text-red-900 bg-red-50 p-2 rounded-lg border border-red-200/80 space-y-0.5 max-w-xs">
-                              <div className="font-bold text-red-800">
-                                💬 "{a.cancellationMessage}"
+                            {a.status === 'cancelled' && a.cancellationMessage && (
+                              <div className="mt-1.5 text-[10px] text-red-900 bg-red-50 p-2 rounded-lg border border-red-200/80 space-y-0.5 max-w-xs">
+                                <div className="font-bold text-red-800">
+                                  💬 "{a.cancellationMessage}"
+                                </div>
+                                {a.smsSent === true ? (
+                                  <div className="text-emerald-700 font-bold flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                    <span>SMS Sent</span>
+                                  </div>
+                                ) : a.smsSent === false ? (
+                                  <div className="text-red-600 font-bold flex items-center gap-1" title={a.smsError}>
+                                    <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
+                                    <span>SMS Failed ({a.smsError || 'Error'})</span>
+                                  </div>
+                                ) : null}
                               </div>
-                              {a.smsSent === true ? (
-                                <div className="text-emerald-700 font-bold flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                  <span>SMS Sent</span>
-                                </div>
-                              ) : a.smsSent === false ? (
-                                <div className="text-red-600 font-bold flex items-center gap-1" title={a.smsError}>
-                                  <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
-                                  <span>SMS Failed ({a.smsError || 'Error'})</span>
-                                </div>
-                              ) : null}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3 space-y-1">
-                          <select
-                            value={a.status}
-                            onChange={(e) =>
-                              handleUpdateApptStatus(a.id, e.target.value as AppointmentStatus)
-                            }
-                            className="bg-[#F5F1E8] border border-emerald-900/20 rounded-lg text-xs font-bold py-1 px-2 focus:outline-none cursor-pointer"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirm</option>
-                            <option value="completed">Complete</option>
-                            <option value="cancelled">Cancel</option>
-                          </select>
-
-                          {a.status !== 'cancelled' && (
-                            <button
-                              onClick={() => openCancelModal(a)}
-                              className="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-red-200"
-                              title="Cancel appointment & send custom message via SMS"
+                            )}
+                          </td>
+                          <td className="p-3 space-y-1">
+                            <select
+                              value={a.status}
+                              onChange={(e) =>
+                                handleUpdateApptStatus(a.id, e.target.value as AppointmentStatus)
+                              }
+                              className="bg-[#F5F1E8] border border-emerald-900/20 rounded-lg text-xs font-bold py-1 px-2 focus:outline-none cursor-pointer"
                             >
-                              <X className="w-3 h-3 text-red-600" /> Cancel
-                            </button>
-                          )}
+                              <option value="pending">Pending</option>
+                              <option value="confirmed">Confirm</option>
+                              <option value="completed">Complete</option>
+                              <option value="cancelled">Cancel</option>
+                            </select>
 
-                          {a.status === 'confirmed' && (
-                            <button
-                              onClick={() => sendConfirmationAlert(a)}
-                              className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-[#0B6B4E] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
-                              title="Resend SMS and Email confirmation alert to patient"
-                            >
-                              <Send className="w-3 h-3 text-[#0B6B4E]" /> Send Alert
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                            {a.status === 'confirmed' && (
+                              <button
+                                onClick={() => sendConfirmationAlert(a)}
+                                className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-[#0B6B4E] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Resend SMS and Email confirmation alert to patient"
+                              >
+                                <Send className="w-3 h-3 text-[#0B6B4E]" /> Send Alert
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1551,33 +1722,149 @@ export const AdminApp: React.FC = () => {
         {/* TAB 4: PATIENTS & REPORTS */}
         {activeTab === 'patients' && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-6">
-            <h2 className="font-heading font-bold text-lg">Registered Patients & Document Uploads</h2>
+            {/* Header with Title and Global Action Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-900/10 pb-4">
+              <div>
+                <h2 className="font-heading font-bold text-lg text-gray-900">Registered Patients & Document Uploads</h2>
+                <p className="text-xs text-gray-500 font-medium">Manage patient profiles, delete selected or all data, and attach lab reports.</p>
+              </div>
+
+              {/* Action Buttons: Delete Selected & Delete All */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                {selectedPatientUids.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={deletingPatients}
+                    onClick={handleDeleteSelectedPatients}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Selected ({selectedPatientUids.length})</span>
+                  </button>
+                )}
+
+                {patients.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={deletingPatients}
+                    onClick={handleDeleteAllPatients}
+                    className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    <span>Delete All Patients ({patients.length})</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Patient List */}
               <div className="space-y-3">
-                <h3 className="font-bold text-xs uppercase tracking-wider text-[#0B6B4E]">Patient Directory</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-[#0B6B4E]">
+                    Patient Directory ({patients.length})
+                  </h3>
+
+                  {patients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllPatients(filteredPatientsList)}
+                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer"
+                    >
+                      {filteredPatientsList.length > 0 &&
+                      filteredPatientsList.every((p) => selectedPatientUids.includes(p.uid))
+                        ? 'Deselect All'
+                        : 'Select All Visible'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Patient Search Bar */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-emerald-700 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search patient by name, email, or phone..."
+                    value={patientSearchQuery}
+                    onChange={(e) => setPatientSearchQuery(e.target.value)}
+                    className="w-full bg-[#F5F1E8] border border-emerald-900/15 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
+                  />
+                </div>
+
                 {patients.length === 0 ? (
-                  <div className="text-xs text-emerald-800">No registered profiles in system yet.</div>
+                  <div className="text-xs text-emerald-800 bg-[#F5F1E8] p-4 rounded-xl border border-dashed border-emerald-900/20 text-center">
+                    No registered patient profiles in system database.
+                  </div>
+                ) : filteredPatientsList.length === 0 ? (
+                  <div className="text-xs text-emerald-800 bg-[#F5F1E8] p-4 rounded-xl text-center">
+                    No patients matching "{patientSearchQuery}".
+                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    {patients.map((p) => (
-                      <div
-                        key={p.uid}
-                        onClick={() => {
-                          setSelectedPatient(p);
-                          setReportUploadSuccess('');
-                        }}
-                        className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                          selectedPatient?.uid === p.uid
-                            ? 'bg-[#0B6B4E] text-white border-[#0B6B4E]'
-                            : 'bg-[#F5F1E8] text-[#0B6B4E] border-emerald-900/10 hover:border-emerald-700'
-                        }`}
-                      >
-                        <div className="font-bold">{p.name}</div>
-                        <div className="text-[11px] opacity-80">{p.email} • {p.phone || 'No phone'}</div>
-                      </div>
-                    ))}
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                    {filteredPatientsList.map((p) => {
+                      const isChecked = selectedPatientUids.includes(p.uid);
+                      const isSelectedForReport = selectedPatient?.uid === p.uid;
+
+                      return (
+                        <div
+                          key={p.uid}
+                          className={`p-3 rounded-xl border text-xs transition-all flex items-center justify-between gap-3 ${
+                            isSelectedForReport
+                              ? 'bg-[#0B6B4E] text-white border-[#0B6B4E] shadow-sm'
+                              : isChecked
+                              ? 'bg-red-50 text-gray-900 border-red-300'
+                              : 'bg-[#F5F1E8] text-[#0B6B4E] border-emerald-900/10 hover:border-emerald-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {/* Selection Checkbox */}
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleSelectPatient(p.uid)}
+                              className="w-4 h-4 accent-red-600 rounded cursor-pointer shrink-0"
+                            />
+
+                            {/* Patient Info (Clicking selects for attaching report) */}
+                            <div
+                              onClick={() => {
+                                setSelectedPatient(p);
+                                setReportUploadSuccess('');
+                              }}
+                              className="cursor-pointer min-w-0 flex-1"
+                            >
+                              <div className="font-bold truncate">{p.name}</div>
+                              <div
+                                className={`text-[11px] truncate ${
+                                  isSelectedForReport ? 'text-emerald-100' : 'opacity-80'
+                                }`}
+                              >
+                                {p.email} • {p.phone || 'No phone'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Individual Action Buttons */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSinglePatient(p);
+                              }}
+                              title="Delete Patient Record"
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                isSelectedForReport
+                                  ? 'bg-red-500/20 hover:bg-red-500/40 text-white'
+                                  : 'hover:bg-red-100 text-red-600'
+                              }`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
