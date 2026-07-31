@@ -13,12 +13,15 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { BookingModal } from './components/booking/BookingModal';
 
-// Code-split lazy loaded PortalPage and AdminApp
+// Code-split lazy loaded PortalPage, AdminApp, and DepartmentDetailPage
 const PortalPage = lazy(() =>
   import('./pages/PortalPage').then((m) => ({ default: m.PortalPage }))
 );
 const AdminApp = lazy(() =>
   import('./admin/AdminApp').then((m) => ({ default: m.AdminApp }))
+);
+const DepartmentDetailPage = lazy(() =>
+  import('./pages/DepartmentDetailPage').then((m) => ({ default: m.DepartmentDetailPage }))
 );
 
 const AppContent: React.FC = () => {
@@ -52,6 +55,7 @@ const AppContent: React.FC = () => {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/departments" element={<DepartmentsPage />} />
+            <Route path="/departments/:departmentId" element={<DepartmentDetailPage />} />
             <Route path="/departments.html" element={<DepartmentsPage />} />
             <Route path="/services" element={<DepartmentsPage />} />
             <Route path="/services.html" element={<DepartmentsPage />} />

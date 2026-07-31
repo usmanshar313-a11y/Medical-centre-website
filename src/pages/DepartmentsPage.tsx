@@ -1,31 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { 
-  Stethoscope, 
-  ShieldAlert, 
-  FlaskConical, 
-  Heart, 
-  Baby, 
+  Search, 
   Calendar, 
   Clock, 
-  Search, 
-  PhoneCall, 
-  UserCheck, 
-  CheckCircle2, 
   Banknote, 
-  Sparkles, 
-  MapPin, 
-  Filter,
-  ChevronRight,
-  Activity
+  UserCheck, 
+  Filter, 
+  Sparkles,
+  ArrowRight,
+  X,
+  Check,
+  RotateCcw
 } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Doctor, Department } from '../types';
-import { BookingModal } from '../components/booking/BookingModal';
+import { Department } from '../types';
 import { DEPARTMENTS_DATA } from '../data/departmentsData';
+import { DepartmentLottieIcon } from '../components/common/DepartmentLottieIcon';
 
 export { DEPARTMENTS_DATA };
 
@@ -35,446 +27,249 @@ export const DepartmentsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
-  const [departments, setDepartments] = useState<Department[]>(DEPARTMENTS_DATA);
+  const [departments] = useState<Department[]>(DEPARTMENTS_DATA);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('All');
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string | undefined>(undefined);
-  const [selectedServiceId, setSelectedServiceId] = useState<string | undefined>(undefined);
+  const [selectedDeptId, setSelectedDeptId] = useState<string>('All');
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const getDepartmentHeaderStyle = (index: number) => {
-    const gradients = [
-      'from-[#0B6B4E] via-[#08523c] to-[#043d2c]', // Classic Emerald
-      'from-[#0f766e] via-[#115e59] to-[#042f2e]', // Teal Emerald
-      'from-[#1e3a8a] via-[#1e40af] to-[#0f172a]', // Indigo Emerald
-      'from-[#065f46] via-[#047857] to-[#022c22]', // Forest Emerald
-      'from-[#0369a1] via-[#075985] to-[#0c4a6e]', // Ocean Blue Emerald
-      'from-[#831843] via-[#701a75] to-[#4c0519]', // Deep Rose Emerald
-      'from-[#334155] via-[#1e293b] to-[#0f172a]', // Slate Charcoal Emerald
-    ];
-    return gradients[index % gradients.length];
-  };
-
-  // Filter departments & internal doctors according to search and filter pill
-  const filteredDepartments = departments
-    .map((dept) => {
-      const term = searchTerm.toLowerCase().trim();
-
-      const matchesDeptFilter =
-        selectedDeptFilter === 'All' ||
-        dept.name.toLowerCase().includes(selectedDeptFilter.toLowerCase()) ||
-        (selectedDeptFilter === 'Surgery' && dept.name.toLowerCase().includes('surgical')) ||
-        (selectedDeptFilter === 'Radiology' && dept.name.toLowerCase().includes('sonology'));
-
-      if (!matchesDeptFilter) return null;
-
-      // Filter doctors inside this department if search term is active
-      const matchingDoctors = dept.doctors.filter((doc) => {
-        if (!term) return true;
-        return (
-          doc.name.toLowerCase().includes(term) ||
-          doc.specialty.toLowerCase().includes(term) ||
-          (doc.bio && doc.bio.toLowerCase().includes(term)) ||
-          dept.name.toLowerCase().includes(term)
-        );
-      });
-
-      const matchesDeptHeader =
-        !term ||
-        dept.name.toLowerCase().includes(term) ||
-        dept.description.toLowerCase().includes(term);
-
-      if (matchesDeptHeader || matchingDoctors.length > 0) {
-        return {
-          ...dept,
-          doctors: term && !matchesDeptHeader ? matchingDoctors : dept.doctors
-        };
-      }
-      return null;
-    })
-    .filter((d): d is Department => d !== null);
-
-  // Total doctor count across filtered list
-  const totalMatchingDoctors = filteredDepartments.reduce((acc, d) => acc + d.doctors.length, 0);
-
-  // GSAP ScrollTrigger Animations for Apple-style reveal
+  // Sync search input with URL search param
   useEffect(() => {
-    // Respect prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReducedMotion) return;
+    if (searchTerm) {
+      setSearchParams({ search: searchTerm }, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchTerm, setSearchParams]);
+
+  // GSAP Entrance animation
+  useEffect(() => {
+    window.scrollTo(0, 0);
 
     const ctx = gsap.context(() => {
-      const sections = containerRef.current?.querySelectorAll('.dept-section');
-      sections?.forEach((section) => {
-        const header = section.querySelector('.dept-header');
-        const cards = section.querySelectorAll('.doctor-card');
-
-        if (header) {
-          gsap.fromTo(
-            header,
-            { opacity: 0, y: 35 },
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.5,
-              ease: 'power2.out',
-              scrollTrigger: {
-                trigger: section,
-                start: 'top 85%',
-                toggleActions: 'play none none none',
-                once: true,
-              },
-            }
-          );
+      gsap.fromTo(
+        '.dept-card',
+        { opacity: 0, y: 20 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.4,
+          stagger: 0.04,
+          ease: 'power2.out',
         }
-
-        if (cards.length > 0) {
-          gsap.fromTo(
-            cards,
-            { opacity: 0, y: 40 },
-            {
-              opacity: 1,
-              y: 0,
-              duration: 0.5,
-              stagger: 0.12,
-              ease: 'power2.out',
-              scrollTrigger: {
-                trigger: section,
-                start: 'top 80%',
-                toggleActions: 'play none none none',
-                once: true,
-              },
-            }
-          );
-        }
-      });
+      );
     }, containerRef);
 
     return () => ctx.revert();
-  }, [filteredDepartments, searchTerm, selectedDeptFilter]);
+  }, [selectedDeptId, searchTerm]);
 
-  // Sync state if URL query changes
-  useEffect(() => {
-    const query = searchParams.get('search');
-    if (query !== null && query !== searchTerm) {
-      setSearchTerm(query);
-    }
-  }, [searchParams]);
+  // Filter departments based on selected department filter or search term
+  const filteredDepartments = departments.filter((dept) => {
+    // 1. Department Filter
+    const matchesDept = selectedDeptId === 'All' || dept.id === selectedDeptId;
+    if (!matchesDept) return false;
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const fetchRealData = async () => {
-      try {
-        const docSnap = await getDocs(collection(db, 'doctors'));
-        const fetchedDocs: Doctor[] = [];
-        docSnap.forEach((d) => fetchedDocs.push({ id: d.id, ...d.data() } as Doctor));
+    // 2. Search Bar
+    if (!searchTerm.trim()) return true;
 
-        if (fetchedDocs.length > 0) {
-          // Merge fetched doctors into appropriate departments
-          const updated = DEPARTMENTS_DATA.map((dept) => {
-            const matchedDocs = fetchedDocs.filter((fd) => {
-              const spec = (fd.specialty || '').toLowerCase();
-              const deptName = dept.name.toLowerCase();
-              if (deptName.includes('general opd') && (spec.includes('general physician') || spec.includes('physician'))) return true;
-              if (deptName.includes('cardiology') && spec.includes('cardio')) return true;
-              if (deptName.includes('orthopedics') && spec.includes('ortho')) return true;
-              if (deptName.includes('pediatrics') && (spec.includes('child') || spec.includes('pediatric'))) return true;
-              if (deptName.includes('obstetrics') && (spec.includes('gynaec') || spec.includes('obstetric'))) return true;
-              if (deptName.includes('radiology') && (spec.includes('sonologist') || spec.includes('radiologist'))) return true;
-              if (deptName.includes('surgical') && (spec.includes('surgeon') || spec.includes('surgery'))) return true;
-              if (deptName.includes('diabetology') && spec.includes('diabet')) return true;
-              if (deptName.includes('chest') && (spec.includes('chest') || spec.includes('pulm'))) return true;
-              if (deptName.includes('gastro') && spec.includes('gastro')) return true;
-              if (deptName.includes('dialysis') && spec.includes('dialysis')) return true;
-              if (deptName.includes('ent') && spec.includes('ent')) return true;
-              if (deptName.includes('dental') && spec.includes('dental')) return true;
-              return false;
-            });
-            return {
-              ...dept,
-              doctors: matchedDocs.length > 0 ? matchedDocs : dept.doctors
-            };
-          });
-          setDepartments(updated);
-        }
-      } catch (e) {
-        console.warn('Using static department fallback data');
-      }
-    };
-    fetchRealData();
-  }, []);
+    const term = searchTerm.toLowerCase();
+    const matchesDeptName = dept.name.toLowerCase().includes(term);
+    const matchesDeptDesc = dept.description.toLowerCase().includes(term);
+    const matchesDoctor = dept.doctors.some(
+      (doc) =>
+        doc.name.toLowerCase().includes(term) ||
+        doc.specialty.toLowerCase().includes(term)
+    );
 
-  const handleSearchChange = (val: string) => {
-    setSearchTerm(val);
-    if (val) {
-      setSearchParams({ search: val });
-    } else {
-      setSearchParams({});
-    }
-  };
+    return matchesDeptName || matchesDeptDesc || matchesDoctor;
+  });
 
-  const handleOpenBooking = (docId?: string, deptId?: string) => {
-    setSelectedDoctorId(docId);
-    setSelectedServiceId(deptId);
-    setBookingModalOpen(true);
-  };
+  const selectedDepartmentObj = departments.find((d) => d.id === selectedDeptId);
 
-  const departmentFilterOptions = [
-    'All',
-    'General OPD',
-    'Cardiology',
-    'Orthopedics',
-    'Surgery',
-    'Pediatrics',
-    'Obstetrics & Gynaecology',
-    'Radiology',
-    'Diabetology',
-    'Chest Medicine',
-    'Gastroenterology',
-    'ENT',
-    'Dental',
-    '24/7 Emergency'
-  ];
-
-  const getDepartmentIcon = (iconName?: string) => {
-    switch (iconName) {
-      case 'heart':
-        return <Heart className="w-6 h-6 text-[#0B6B4E]" />;
-      case 'baby':
-        return <Baby className="w-6 h-6 text-[#0B6B4E]" />;
-      case 'flask':
-        return <FlaskConical className="w-6 h-6 text-[#0B6B4E]" />;
-      case 'shield-alert':
-        return <ShieldAlert className="w-6 h-6 text-[#D64545]" />;
-      case 'activity':
-        return <Activity className="w-6 h-6 text-[#0B6B4E]" />;
-      default:
-        return <Stethoscope className="w-6 h-6 text-[#0B6B4E]" />;
-    }
-  };
+  // Modal Department List filtered by internal search
+  const modalDepartments = departments.filter((d) =>
+    d.name.toLowerCase().includes(modalSearchTerm.toLowerCase())
+  );
 
   return (
-    <div ref={containerRef} className="bg-[#F5F1E8] min-h-screen py-10 text-[#0B6B4E]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
+    <div ref={containerRef} className="bg-[#F5F1E8] min-h-screen py-8 sm:py-10 text-[#0B6B4E]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
 
-        {/* Filter & Search Bar */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div className="relative flex-1 w-full">
-              <Search className="w-5 h-5 text-emerald-700 absolute left-3.5 top-3.5" />
-              <input
-                type="text"
-                placeholder="Search by department name, doctor name, or medical specialty (e.g. Cardiology, Dr. Wajid, Surgery)..."
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full bg-[#F5F1E8] border border-emerald-900/20 rounded-xl pl-11 pr-4 py-3 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => handleSearchChange('')}
-                  className="absolute right-3 top-2.5 text-xs bg-emerald-100 text-[#0B6B4E] px-2.5 py-1 rounded-lg font-bold hover:bg-emerald-200 cursor-pointer"
-                >
-                  Clear
-                </button>
-              )}
+        {/* Hero Banner Section */}
+        <div className="bg-gradient-to-r from-[#0B6B4E] via-[#08523c] to-[#053b2b] text-white rounded-3xl p-7 sm:p-12 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+          <div className="max-w-3xl space-y-3 sm:space-y-4 relative z-10">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-xs font-extrabold uppercase tracking-wider text-amber-300">
+              <Sparkles className="w-4 h-4" />
+              <span>Rafah-e-Aam Medical Centre OPD</span>
             </div>
-
-            {searchTerm && (
-              <div className="text-xs font-bold bg-emerald-100 text-[#0B6B4E] px-3.5 py-2.5 rounded-xl border border-emerald-300/60 whitespace-nowrap">
-                Found {filteredDepartments.length} department(s) & {totalMatchingDoctors} doctor(s)
-              </div>
-            )}
-          </div>
-
-          {/* Department Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-xs font-bold text-emerald-900 mr-2 flex items-center gap-1 shrink-0">
-              <Filter className="w-3.5 h-3.5" /> Filter Department:
-            </span>
-            {departmentFilterOptions.map((deptName) => (
-              <button
-                key={deptName}
-                onClick={() => setSelectedDeptFilter(deptName)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedDeptFilter === deptName
-                    ? 'bg-[#0B6B4E] text-white shadow-xs'
-                    : 'bg-[#F5F1E8] text-[#0B6B4E] hover:bg-emerald-900/10'
-                }`}
-              >
-                {deptName}
-              </button>
-            ))}
+            <h1 className="font-heading font-extrabold text-2xl sm:text-5xl tracking-tight leading-tight">
+              Medical Departments & Specialists
+            </h1>
+            <p className="text-xs sm:text-base text-emerald-100 font-medium leading-relaxed max-w-2xl">
+              Browse our medical departments below. Click "Show Doctors" on any department to view consulting specialists, schedule, and book visits.
+            </p>
           </div>
         </div>
 
-        {/* Department Cards & Grouped Doctor Panels */}
-        {filteredDepartments.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl text-center space-y-3 border border-emerald-900/10">
-            <UserCheck className="w-12 h-12 text-emerald-600 mx-auto" />
-            <h3 className="font-heading font-bold text-lg text-emerald-950">No Departments or Doctors Found</h3>
-            <p className="text-xs sm:text-sm text-emerald-800 max-w-md mx-auto">
-              No medical department or consultant matched "{searchTerm}". Try searching for another keyword or reset filters.
-            </p>
+        {/* Search & Filter Controls (Uncluttered, Single Dropdown/Popup Button) */}
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-emerald-900/10 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          
+          {/* Text Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4.5 h-4.5 text-emerald-600 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search department, doctor, or specialty..."
+              className="w-full pl-11 pr-10 py-3 bg-[#FAF8F3] border border-emerald-900/15 rounded-xl text-xs sm:text-sm font-semibold text-[#0B6B4E] placeholder:text-emerald-800/50 focus:outline-hidden focus:ring-2 focus:ring-[#0B6B4E] transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100 px-2 py-1 rounded-md cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Department Filter Trigger Button */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => { handleSearchChange(''); setSelectedDeptFilter('All'); }}
-              className="bg-[#0B6B4E] text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold cursor-pointer hover:bg-[#08523c]"
+              onClick={() => setIsFilterModalOpen(true)}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2.5 px-4 sm:px-5 py-3 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                selectedDeptId !== 'All'
+                  ? 'bg-[#0B6B4E] text-white border-[#0B6B4E] shadow-2xs'
+                  : 'bg-[#FAF8F3] text-[#0B6B4E] border-emerald-900/15 hover:bg-emerald-50'
+              }`}
             >
-              Reset Search & Filters
+              <Filter className="w-4 h-4 shrink-0" />
+              <span className="truncate max-w-[180px] sm:max-w-[220px]">
+                {selectedDeptId === 'All'
+                  ? 'Filter by Department'
+                  : `Dept: ${selectedDepartmentObj?.name || selectedDeptId}`}
+              </span>
+              {selectedDeptId !== 'All' && (
+                <span className="bg-amber-300 text-[#0B6B4E] text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                  1
+                </span>
+              )}
+            </button>
+
+            {selectedDeptId !== 'All' && (
+              <button
+                onClick={() => setSelectedDeptId('All')}
+                title="Reset Department Filter"
+                className="p-3 rounded-xl bg-red-50 text-[#D64545] border border-red-200/60 hover:bg-red-100 transition-colors cursor-pointer shrink-0"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Results Counter & Active Filter Badge */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-bold text-emerald-800 px-1">
+          <div className="flex items-center gap-2">
+            <span>Showing {filteredDepartments.length} Department{filteredDepartments.length === 1 ? '' : 's'}</span>
+            {selectedDeptId !== 'All' && selectedDepartmentObj && (
+              <span className="bg-emerald-100 text-[#0B6B4E] px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 border border-emerald-300">
+                <span>{selectedDepartmentObj.name}</span>
+                <button
+                  onClick={() => setSelectedDeptId('All')}
+                  className="hover:text-red-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            )}
+          </div>
+          {searchTerm && (
+            <span className="text-[#0B6B4E]">
+              Search query: "{searchTerm}"
+            </span>
+          )}
+        </div>
+
+        {/* Department Summary Cards Grid (Clean, Deliberate Whitespace, Single Primary CTA) */}
+        {filteredDepartments.length === 0 ? (
+          <div className="bg-white p-10 sm:p-12 rounded-3xl border border-emerald-900/10 text-center space-y-4">
+            <p className="text-base font-bold text-[#0B6B4E]">No matching medical departments found</p>
+            <p className="text-xs text-emerald-700">Try adjusting your search text or department filter selection.</p>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedDeptId('All');
+              }}
+              className="px-5 py-2.5 bg-[#0B6B4E] text-white text-xs font-bold rounded-xl hover:bg-[#08523c] transition-colors cursor-pointer"
+            >
+              Reset All Filters
             </button>
           </div>
         ) : (
-          <div className="space-y-16 sm:space-y-20">
-            {filteredDepartments.map((dept, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {filteredDepartments.map((dept) => (
               <div
                 key={dept.id}
-                className="dept-section bg-white rounded-3xl shadow-md border border-emerald-900/15 overflow-hidden transition-all hover:shadow-lg"
+                className="dept-card bg-white rounded-3xl border border-emerald-900/15 shadow-2xs hover:shadow-md hover:border-[#0B6B4E]/40 transition-all p-6 sm:p-7 flex flex-col justify-between space-y-6 group"
               >
-                {/* Department Header Bar with Varying Gradient Colors */}
-                <div className={`dept-header bg-gradient-to-r ${getDepartmentHeaderStyle(index)} text-white p-6 sm:p-8 md:p-9 border-b border-emerald-800/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-6`}>
-                  <div className="flex items-start sm:items-center gap-4 sm:gap-5 min-w-0 w-full md:w-auto">
-                    <div className="p-3.5 sm:p-4 bg-white/15 rounded-2xl backdrop-blur-md text-white shrink-0 shadow-inner">
-                      {getDepartmentIcon(dept.icon)}
+                <div className="space-y-4">
+                  {/* Department Card Header: Lottie Icon + Title */}
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-[#FAF8F3] group-hover:bg-emerald-50 rounded-2xl border border-emerald-900/10 transition-colors shrink-0">
+                      <DepartmentLottieIcon iconType={dept.icon} size={44} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <h2 className="font-heading font-extrabold text-2xl sm:text-3xl text-white tracking-tight">
-                          {dept.name}
-                        </h2>
-                        <span className="bg-amber-300 text-[#0B6B4E] text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shrink-0 shadow-xs">
-                          {dept.doctors.length} Specialist{dept.doctors.length === 1 ? '' : 's'}
-                        </span>
+                      <h2 className="font-heading font-extrabold text-lg sm:text-xl text-[#0B6B4E] leading-snug group-hover:text-[#08523c] transition-colors">
+                        {dept.name}
+                      </h2>
+                      <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>{dept.doctors.length} Specialist{dept.doctors.length === 1 ? '' : 's'}</span>
                       </div>
-                      <p className="text-xs sm:text-sm md:text-base text-emerald-100/95 leading-relaxed mt-2 max-w-3xl font-medium">
-                        {dept.description}
-                      </p>
                     </div>
                   </div>
 
-                  {/* Summary Badges */}
-                  <div className="flex flex-wrap md:flex-col items-start md:items-end gap-2.5 shrink-0 pt-4 md:pt-0 border-t border-white/20 md:border-t-0 w-full md:w-auto mt-2 md:mt-0">
-                    {dept.days && (
-                      <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md text-xs sm:text-sm font-semibold text-emerald-50 max-w-full">
-                        <Calendar className="w-4 h-4 text-amber-300 shrink-0" />
-                        <span className="truncate">Days: {dept.days}</span>
+                  {/* Description */}
+                  <p className="text-xs sm:text-sm text-emerald-900/80 font-medium leading-relaxed line-clamp-3">
+                    {dept.description}
+                  </p>
+
+                  {/* Schedule Metadata */}
+                  <div className="space-y-2 pt-3 border-t border-emerald-900/10 text-xs text-emerald-800">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Days:
                       </span>
-                    )}
-                    {dept.timing && (
-                      <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md text-xs sm:text-sm font-semibold text-emerald-50 max-w-full">
-                        <Clock className="w-4 h-4 text-amber-300 shrink-0" />
-                        <span className="truncate">Timings: {dept.timing}</span>
+                      <span className="font-bold text-[#0B6B4E]">{dept.days || 'Mon - Sat'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" /> Timing:
                       </span>
-                    )}
-                    {dept.fee && (
-                      <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-100 text-[#0B6B4E] border border-emerald-300 text-xs sm:text-sm font-extrabold shadow-sm max-w-full">
-                        <Banknote className="w-4 h-4 text-[#0B6B4E] shrink-0" />
-                        <span className="truncate">Fee: {dept.fee}</span>
+                      <span className="font-bold text-[#0B6B4E]">{dept.timing || '09:00 AM - 05:00 PM'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Banknote className="w-3.5 h-3.5 text-emerald-600" /> Fee:
                       </span>
-                    )}
+                      <span className="font-extrabold text-[#0B6B4E]">{dept.fee || 'Rs. 1,000'}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Sub-cards: Doctors belonging to this department (Desktop: 2 per row) */}
-                <div className="p-5 sm:p-8 md:p-9 bg-[#FAF8F3]">
-                  <div className="text-xs sm:text-sm font-extrabold text-[#0B6B4E] uppercase tracking-wider mb-6 flex items-center gap-2">
-                    <UserCheck className="w-4.5 h-4.5 text-[#0B6B4E] shrink-0" />
-                    <span>Consulting Specialists & Doctors ({dept.doctors.length}):</span>
-                  </div>
-
-                  {dept.doctors.length === 0 ? (
-                    <div className="p-6 bg-white rounded-2xl border border-emerald-900/10 text-xs sm:text-sm text-emerald-800 font-medium">
-                      No specific doctor matches current search in this department. Walk-in consultations are available at reception.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-                      {dept.doctors.map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="doctor-card bg-white rounded-2xl border border-emerald-900/15 shadow-xs hover:shadow-md transition-all p-6 sm:p-7 flex flex-col justify-between space-y-5 overflow-hidden w-full"
-                        >
-                          <div className="space-y-4 min-w-0 w-full">
-                            {/* Doctor Photo & Header */}
-                            <div className="flex items-start gap-4 sm:gap-5 min-w-0 w-full">
-                              <img
-                                src={doc.photoURL || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80'}
-                                alt={doc.name}
-                                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover object-top border-2 border-emerald-900/15 bg-emerald-100 shrink-0 shadow-sm"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-heading font-extrabold text-lg sm:text-xl text-[#0B6B4E] leading-snug truncate">
-                                  {doc.name}
-                                </h3>
-                                <div className="text-xs sm:text-sm font-bold text-[#D64545] bg-red-50 border border-red-200/60 px-3 py-1 rounded-lg inline-block mt-1.5 max-w-full truncate">
-                                  {doc.specialty}
-                                </div>
-                                {doc.roomNumber && (
-                                  <div className="text-xs text-emerald-800 font-bold mt-2 flex items-center gap-1.5">
-                                    <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                                    <span className="truncate">Location: {doc.roomNumber}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Bio */}
-                            {doc.bio && (
-                              <div className="bg-[#F5F1E8] p-4 rounded-xl border border-emerald-900/10 text-xs sm:text-sm text-emerald-900/90 leading-relaxed break-words font-medium">
-                                {doc.bio}
-                              </div>
-                            )}
-
-                            {/* Icons + Details Rows */}
-                            <div className="space-y-2.5 pt-3 border-t border-emerald-900/10 text-xs sm:text-sm w-full min-w-0">
-                              {/* Days */}
-                              <div className="flex items-center justify-between gap-2 text-emerald-900 w-full min-w-0">
-                                <div className="flex items-center gap-2 font-medium text-emerald-800 shrink-0">
-                                  <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                                  <span>Days:</span>
-                                </div>
-                                <span className="font-bold text-[#0B6B4E] text-right truncate">
-                                  {Array.isArray(doc.availableDays) ? doc.availableDays.join(', ') : doc.availableDays || dept.days || 'Mon - Sat'}
-                                </span>
-                              </div>
-
-                              {/* Timing */}
-                              <div className="flex items-center justify-between gap-2 text-emerald-900 w-full min-w-0">
-                                <div className="flex items-center gap-2 font-medium text-emerald-800 shrink-0">
-                                  <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-                                  <span>Timing:</span>
-                                </div>
-                                <span className="font-bold text-[#0B6B4E] text-right truncate">
-                                  {doc.timing || dept.timing || '09:00 AM - 05:00 PM'}
-                                </span>
-                              </div>
-
-                              {/* Consultation Fee */}
-                              <div className="flex items-center justify-between gap-2 text-emerald-900 w-full min-w-0">
-                                <div className="flex items-center gap-2 font-medium text-emerald-800 shrink-0">
-                                  <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
-                                  <span>Consultation Fee:</span>
-                                </div>
-                                <span className="font-extrabold text-sm sm:text-base text-[#0B6B4E] bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-lg shrink-0">
-                                  {doc.fee || dept.fee || 'Rs. 1,000'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* CTA Button */}
-                          <button
-                            onClick={() => handleOpenBooking(doc.id, dept.id)}
-                            className="w-full bg-[#0B6B4E] hover:bg-[#08523c] active:bg-[#064230] text-white py-3 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer group shrink-0 mt-3"
-                          >
-                            <Calendar className="w-4.5 h-4.5 shrink-0" />
-                            <span className="truncate">Book Visit with {doc.name.split(' ')[1] || doc.name}</span>
-                            <ChevronRight className="w-4 h-4 shrink-0 group-hover:translate-x-1 transition-transform ml-auto" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Primary Dedicated CTA Button -> Navigates to /departments/:departmentId */}
+                <Link
+                  to={`/departments/${dept.id}`}
+                  className="w-full bg-[#0B6B4E] hover:bg-[#08523c] active:bg-[#064230] text-white py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer group/btn"
+                >
+                  <span>Show Doctors</span>
+                  <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                </Link>
               </div>
             ))}
           </div>
@@ -482,12 +277,124 @@ export const DepartmentsPage: React.FC = () => {
 
       </div>
 
-      <BookingModal
-        isOpen={bookingModalOpen}
-        onClose={() => setBookingModalOpen(false)}
-        preselectedDoctorId={selectedDoctorId}
-        preselectedServiceId={selectedServiceId}
-      />
+      {/* Department Selection Filter Modal / Bottom Sheet */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in">
+          <div
+            className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[85vh] flex flex-col shadow-2xl border border-emerald-900/10 overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-emerald-900/10 flex items-center justify-between bg-[#FAF8F3]">
+              <div>
+                <h3 className="font-heading font-extrabold text-lg text-[#0B6B4E]">
+                  Filter by Department
+                </h3>
+                <p className="text-xs text-emerald-800 font-medium mt-0.5">
+                  Select a medical specialty to narrow down departments
+                </p>
+              </div>
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="p-2 rounded-full hover:bg-emerald-100 text-emerald-900 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Quick Search */}
+            <div className="p-4 border-b border-emerald-900/10 bg-white">
+              <div className="relative">
+                <Search className="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={modalSearchTerm}
+                  onChange={(e) => setModalSearchTerm(e.target.value)}
+                  placeholder="Type to filter departments list..."
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#FAF8F3] border border-emerald-900/15 rounded-xl text-xs font-semibold text-[#0B6B4E] focus:outline-hidden focus:ring-2 focus:ring-[#0B6B4E]"
+                />
+              </div>
+            </div>
+
+            {/* Department List Options */}
+            <div className="p-3 sm:p-4 overflow-y-auto space-y-1.5 flex-1 divide-y divide-emerald-900/5">
+              {/* All Departments Option */}
+              <button
+                onClick={() => {
+                  setSelectedDeptId('All');
+                  setIsFilterModalOpen(false);
+                }}
+                className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  selectedDeptId === 'All'
+                    ? 'bg-[#0B6B4E] text-white'
+                    : 'hover:bg-emerald-50 text-[#0B6B4E]'
+                }`}
+              >
+                <span>All Departments ({departments.length})</span>
+                {selectedDeptId === 'All' && <Check className="w-4 h-4 text-amber-300" />}
+              </button>
+
+              {/* Specific Department Options */}
+              {modalDepartments.map((dept) => {
+                const isSelected = selectedDeptId === dept.id;
+                return (
+                  <button
+                    key={dept.id}
+                    onClick={() => {
+                      setSelectedDeptId(dept.id);
+                      setIsFilterModalOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-xl flex items-center justify-between text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0B6B4E] text-white'
+                        : 'hover:bg-emerald-50 text-emerald-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <DepartmentLottieIcon iconType={dept.icon} size={28} />
+                      <span className="truncate">{dept.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                        isSelected ? 'bg-emerald-800 text-amber-200' : 'bg-emerald-100 text-[#0B6B4E]'
+                      }`}>
+                        {dept.doctors.length} Doc{dept.doctors.length === 1 ? '' : 's'}
+                      </span>
+                      {isSelected && <Check className="w-4 h-4 text-amber-300" />}
+                    </div>
+                  </button>
+                );
+              })}
+
+              {modalDepartments.length === 0 && (
+                <div className="py-8 text-center text-xs text-emerald-800 font-medium">
+                  No department matching "{modalSearchTerm}"
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-emerald-900/10 bg-[#FAF8F3] flex items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  setSelectedDeptId('All');
+                  setModalSearchTerm('');
+                  setIsFilterModalOpen(false);
+                }}
+                className="px-4 py-2.5 text-xs font-bold text-[#D64545] bg-red-50 hover:bg-red-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Reset Filter
+              </button>
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="px-5 py-2.5 bg-[#0B6B4E] text-white text-xs font-bold rounded-xl hover:bg-[#08523c] transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
