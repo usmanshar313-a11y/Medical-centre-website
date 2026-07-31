@@ -18,15 +18,21 @@ const app = appExists ? getApp() : initializeApp(firebaseConfig);
 const dbId = config.firestoreDatabaseId || '(default)';
 
 // Initialize Firestore with force long polling for reliable connectivity in sandboxed/iframe environments
-export const db = appExists
-  ? getFirestore(app, dbId)
-  : initializeFirestore(
-      app,
-      {
-        experimentalForceLongPolling: true,
-      },
-      dbId
-    );
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(
+    app,
+    {
+      experimentalForceLongPolling: true,
+      experimentalAutoDetectLongPolling: false,
+    },
+    dbId
+  );
+} catch (e) {
+  dbInstance = getFirestore(app, dbId);
+}
+
+export const db = dbInstance;
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

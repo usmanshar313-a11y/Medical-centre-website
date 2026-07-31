@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -7,13 +7,20 @@ import {
   MapPin, 
   Banknote, 
   UserCheck, 
-  Loader2
+  Loader2,
+  Info,
+  X,
+  Sparkles
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { db } from '../firebase';
 import { DEPARTMENTS_DATA } from '../data/departmentsData';
 import { Department, Doctor } from '../types';
-import { DepartmentLottieIcon } from '../components/common/DepartmentLottieIcon';
+import { DepartmentIcon } from '../components/common/DepartmentIcon';
+
+gsap.registerPlugin(ScrollTrigger);
 
 // In-Memory Doctor Cache to prevent redundant Firestore network reads
 const departmentDoctorCache: Record<string, Doctor[]> = {};
@@ -23,6 +30,9 @@ export const DepartmentDetailPage: React.FC = () => {
 
   const [department, setDepartment] = useState<Department | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [selectedDoctorForModal, setSelectedDoctorForModal] = useState<Doctor | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -53,12 +63,12 @@ export const DepartmentDetailPage: React.FC = () => {
         return;
       }
 
-      // 2. Lazy load doctor data from Firestore if not cached
+      // 2. Lazy load doctor data from Firestore if not cached (with fallback timeout)
       setLoading(true);
       try {
         const fetchPromise = getDocs(collection(db, 'doctors'));
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore fetch timeout')), 2500)
+          setTimeout(() => reject(new Error('Firestore fetch timeout')), 2000)
         );
 
         const docSnap = await Promise.race([fetchPromise, timeoutPromise]);
@@ -97,8 +107,8 @@ export const DepartmentDetailPage: React.FC = () => {
         } else {
           departmentDoctorCache[targetId] = currentDept.doctors;
         }
-      } catch (err) {
-        console.warn('Using static fallback for department doctors:', departmentId);
+      } catch {
+        // Silent fallback to local static data
         departmentDoctorCache[targetId] = currentDept.doctors;
       } finally {
         setDepartment(currentDept);
@@ -108,6 +118,35 @@ export const DepartmentDetailPage: React.FC = () => {
 
     loadDepartmentData();
   }, [departmentId]);
+
+  // GSAP Entrance Scroll Animation for Doctor Cards
+  useEffect(() => {
+    if (!department || loading) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        '.doc-card',
+        { opacity: 0, y: 35 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: containerRef.current,
+            start: 'top 85%',
+            once: true,
+          },
+        }
+      );
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, [department, loading]);
 
   const handleOpenBooking = (docId: string) => {
     window.dispatchEvent(
@@ -119,10 +158,10 @@ export const DepartmentDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center p-6 text-[#0B6B4E]">
         <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-[#0B6B4E] animate-spin mx-auto" />
-          <p className="text-sm font-bold text-[#0B6B4E]">Loading Department Doctors...</p>
+          <Loader2 className="w-9 h-9 text-[#0B6B4E] animate-spin mx-auto" />
+          <p className="text-xs font-bold text-[#0B6B4E]">Loading Department Specialists...</p>
         </div>
       </div>
     );
@@ -130,17 +169,17 @@ export const DepartmentDetailPage: React.FC = () => {
 
   if (!department) {
     return (
-      <div className="min-h-screen bg-[#F5F1E8] py-16 px-4">
-        <div className="max-w-3xl mx-auto bg-white p-8 sm:p-10 rounded-3xl text-center space-y-6 shadow-xs border border-emerald-900/10">
-          <h2 className="text-2xl font-extrabold text-[#0B6B4E]">Department Not Found</h2>
+      <div className="min-h-screen bg-[#F5F1E8] py-16 px-4 text-[#0B6B4E]">
+        <div className="max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-3xl text-center space-y-6 shadow-2xs border border-emerald-900/10">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-[#0B6B4E]">Department Not Found</h2>
           <p className="text-xs sm:text-sm text-emerald-800 font-medium">
             The requested medical department could not be located in our OPD directory.
           </p>
           <Link
             to="/departments"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#0B6B4E] text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-[#08523c] transition-colors shadow-2xs"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0B6B4E] text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-[#08523c] transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to All Departments
+            <ArrowLeft className="w-4 h-4" /> Back to Departments
           </Link>
         </div>
       </div>
@@ -148,77 +187,48 @@ export const DepartmentDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="bg-[#F5F1E8] min-h-screen py-8 sm:py-10 text-[#0B6B4E]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <div ref={containerRef} className="bg-[#F5F1E8] min-h-screen py-6 sm:py-8 text-[#0B6B4E]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         
-        {/* Uncluttered Navigation Bar */}
-        <div>
-          <Link
-            to="/departments"
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-extrabold text-[#0B6B4E] hover:text-[#08523c] bg-white px-4 py-2.5 rounded-xl border border-emerald-900/10 shadow-2xs transition-all hover:-translate-x-0.5"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Departments
-          </Link>
-        </div>
+        {/* Navigation & Header Section */}
+        <div className="space-y-4">
+          {/* ← Back to Departments link (Positioned Top-Left) */}
+          <div>
+            <Link
+              to="/departments"
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#0B6B4E] hover:text-[#08523c] bg-white px-3.5 py-2 rounded-xl border border-emerald-900/10 shadow-2xs transition-all hover:-translate-x-0.5"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Departments
+            </Link>
+          </div>
 
-        {/* Clean Header Card with Context */}
-        <div className="bg-gradient-to-br from-[#0B6B4E] to-[#064230] text-white p-7 sm:p-10 rounded-3xl shadow-md border border-emerald-800/40 space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div className="flex items-center gap-4 sm:gap-5">
-              <div className="p-3.5 sm:p-4 bg-white/15 rounded-2xl backdrop-blur-md shrink-0 shadow-inner">
-                <DepartmentLottieIcon iconType={department.icon} size={48} />
-              </div>
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="font-heading font-extrabold text-2xl sm:text-4xl text-white tracking-tight">
-                    {department.name}
-                  </h1>
-                  <span className="bg-amber-300 text-[#0B6B4E] text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shrink-0 shadow-2xs">
-                    {department.doctors.length} Specialist{department.doctors.length === 1 ? '' : 's'}
-                  </span>
-                </div>
-              </div>
+          {/* Simple, Formal, Compact Department Header */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-emerald-900/15 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 shrink-0 text-[#0B6B4E]">
+              <DepartmentIcon iconType={department.icon} className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="font-heading font-extrabold text-xl sm:text-2xl text-[#0B6B4E] leading-tight">
+                {department.name}
+              </h1>
+              <p className="text-xs sm:text-sm text-emerald-800/90 font-medium mt-1 line-clamp-2">
+                {department.description}
+              </p>
             </div>
           </div>
+        </div>
 
-          <p className="text-xs sm:text-base text-emerald-100/95 leading-relaxed max-w-4xl font-medium">
-            {department.description}
-          </p>
-
-          {/* Key OPD Info Badges */}
-          <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-white/20 text-xs sm:text-sm">
-            {department.days && (
-              <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/15 backdrop-blur-md font-semibold text-emerald-50">
-                <Calendar className="w-4 h-4 text-amber-300" />
-                <span>Days: {department.days}</span>
-              </span>
-            )}
-            {department.timing && (
-              <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/15 backdrop-blur-md font-semibold text-emerald-50">
-                <Clock className="w-4 h-4 text-amber-300" />
-                <span>OPD Hours: {department.timing}</span>
-              </span>
-            )}
-            {department.fee && (
-              <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-300 text-[#0B6B4E] font-extrabold shadow-2xs">
-                <Banknote className="w-4 h-4 text-[#0B6B4E]" />
-                <span>Fee: {department.fee}</span>
-              </span>
-            )}
+        {/* Section Indicator */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#0B6B4E]">
+            <UserCheck className="w-4.5 h-4.5 text-[#0B6B4E]" />
+            <span>Consulting Specialists ({department.doctors.length})</span>
           </div>
         </div>
 
-        {/* Doctor List Title */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2 text-xs sm:text-base font-extrabold uppercase tracking-wider text-[#0B6B4E]">
-            <UserCheck className="w-5 h-5 text-[#0B6B4E]" />
-            <span>Consulting Specialists & Doctors ({department.doctors.length})</span>
-          </div>
-        </div>
-
-        {/* Doctor Cards Grid (Unchanged Design, Clean Whitespace, Single Primary CTA) */}
+        {/* Doctor Cards Grid (2 Columns Desktop, 1 Column Mobile, Generous Whitespace, Formal Styling) */}
         {department.doctors.length === 0 ? (
-          <div className="bg-white p-8 sm:p-10 rounded-3xl border border-emerald-900/10 text-center space-y-3">
+          <div className="bg-white p-8 sm:p-10 rounded-2xl border border-emerald-900/10 text-center space-y-3">
             <p className="text-sm text-emerald-800 font-medium">
               No individual consultant listed online for this department at the moment.
             </p>
@@ -231,95 +241,203 @@ export const DepartmentDetailPage: React.FC = () => {
             {department.doctors.map((doc) => (
               <div
                 key={doc.id}
-                className="bg-white rounded-3xl border border-emerald-900/15 shadow-2xs hover:shadow-md transition-all p-6 sm:p-7 flex flex-col justify-between space-y-6 overflow-hidden w-full"
+                className="doc-card bg-white rounded-2xl border border-emerald-900/15 shadow-2xs hover:shadow-md transition-all p-6 sm:p-7 flex flex-col justify-between space-y-6"
               >
-                <div className="space-y-4 min-w-0 w-full">
-                  {/* Doctor Photo & Details */}
-                  <div className="flex items-start gap-4 sm:gap-5 min-w-0 w-full">
+                <div className="space-y-4">
+                  {/* Photo, Name, Specialty, Room */}
+                  <div className="flex items-start gap-4">
                     <img
                       src={
                         doc.photoURL ||
                         'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80'
                       }
                       alt={doc.name}
-                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover object-top border-2 border-emerald-900/15 bg-emerald-100 shrink-0 shadow-2xs"
+                      className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl object-cover object-top border border-emerald-900/15 bg-emerald-50 shrink-0 shadow-2xs"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src =
                           'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80';
                       }}
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-heading font-extrabold text-lg sm:text-xl text-[#0B6B4E] leading-snug truncate">
+                      <h3 className="font-heading font-extrabold text-base sm:text-lg text-[#0B6B4E] leading-tight truncate">
                         {doc.name}
                       </h3>
-                      <div className="text-xs sm:text-sm font-bold text-[#D64545] bg-red-50 border border-red-200/60 px-3 py-1 rounded-lg inline-block mt-1.5 max-w-full truncate">
+                      <p className="text-xs font-bold text-[#D64545] mt-1 truncate">
                         {doc.specialty}
-                      </div>
+                      </p>
                       {doc.roomNumber && (
-                        <div className="text-xs text-emerald-800 font-bold mt-2 flex items-center gap-1.5">
-                          <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span className="truncate">Location: {doc.roomNumber}</span>
-                        </div>
+                        <p className="text-xs text-emerald-800 font-medium mt-1.5 flex items-center gap-1.5 truncate">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">OPD Room: {doc.roomNumber}</span>
+                        </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Bio */}
-                  {doc.bio && (
-                    <div className="bg-[#FAF8F3] p-4 rounded-xl border border-emerald-900/10 text-xs sm:text-sm text-emerald-900/90 leading-relaxed break-words font-medium">
-                      {doc.bio}
-                    </div>
-                  )}
-
-                  {/* Days, Timing & Fee Details */}
-                  <div className="space-y-2.5 pt-3 border-t border-emerald-900/10 text-xs sm:text-sm w-full min-w-0">
-                    <div className="flex items-center justify-between gap-2 text-emerald-900 w-full min-w-0">
-                      <div className="flex items-center gap-2 font-medium text-emerald-800 shrink-0">
-                        <Calendar className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Days:</span>
-                      </div>
-                      <span className="font-bold text-[#0B6B4E] text-right truncate">
+                  {/* Schedule & Fee Info */}
+                  <div className="space-y-2 pt-3 border-t border-emerald-900/10 text-xs text-emerald-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 font-medium shrink-0">
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Days:
+                      </span>
+                      <span className="font-bold text-[#0B6B4E] truncate text-right">
                         {Array.isArray(doc.availableDays)
                           ? doc.availableDays.join(', ')
                           : doc.availableDays || department.days || 'Mon - Sat'}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 text-emerald-900 w-full min-w-0">
-                      <div className="flex items-center gap-2 font-medium text-emerald-800 shrink-0">
-                        <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Timing:</span>
-                      </div>
-                      <span className="font-bold text-[#0B6B4E] text-right truncate">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 font-medium shrink-0">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600" /> Timing:
+                      </span>
+                      <span className="font-bold text-[#0B6B4E] truncate text-right">
                         {doc.timing || department.timing || '09:00 AM - 05:00 PM'}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 text-emerald-900 w-full min-w-0">
-                      <div className="flex items-center gap-2 font-medium text-emerald-800 shrink-0">
-                        <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Consultation Fee:</span>
-                      </div>
-                      <span className="font-extrabold text-sm sm:text-base text-[#0B6B4E] bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-lg shrink-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 font-medium shrink-0">
+                        <Banknote className="w-3.5 h-3.5 text-emerald-600" /> Fee:
+                      </span>
+                      <span className="font-extrabold text-[#0B6B4E] text-xs bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
                         {doc.fee || department.fee || 'Rs. 1,000'}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Single Primary CTA Button */}
-                <button
-                  onClick={() => handleOpenBooking(doc.id)}
-                  className="w-full bg-[#0B6B4E] hover:bg-[#08523c] active:bg-[#064230] text-white py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer group shrink-0 mt-3"
-                >
-                  <Calendar className="w-4.5 h-4.5 shrink-0" />
-                  <span>Book Visit with {doc.name.split(' ')[1] || doc.name}</span>
-                </button>
+                {/* Actions: One Primary CTA ("Book Appointment") + One Secondary Link ("View Detail") */}
+                <div className="pt-3 border-t border-emerald-900/10 flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedDoctorForModal(doc)}
+                    className="flex-1 border border-emerald-900/15 hover:bg-emerald-50 text-[#0B6B4E] py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>View Detail</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenBooking(doc.id)}
+                    className="flex-1 bg-[#0B6B4E] hover:bg-[#08523c] active:bg-[#064230] text-white py-2.5 px-3 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Book Appointment</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
+
       </div>
+
+      {/* Doctor Detail Modal */}
+      {selectedDoctorForModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in"
+          onClick={() => setSelectedDoctorForModal(null)}
+        >
+          <div
+            className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-emerald-900/10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 border-b border-emerald-900/10 flex items-center justify-between bg-[#FAF8F3]">
+              <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#0B6B4E]">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>Doctor Details</span>
+              </div>
+              <button
+                onClick={() => setSelectedDoctorForModal(null)}
+                className="p-1.5 rounded-full hover:bg-emerald-100 text-emerald-900 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5">
+              <div className="flex items-start gap-4">
+                <img
+                  src={
+                    selectedDoctorForModal.photoURL ||
+                    'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80'
+                  }
+                  alt={selectedDoctorForModal.name}
+                  className="w-20 h-20 rounded-xl object-cover object-top border border-emerald-900/15 bg-emerald-50 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-heading font-extrabold text-lg text-[#0B6B4E]">
+                    {selectedDoctorForModal.name}
+                  </h3>
+                  <p className="text-xs font-bold text-[#D64545] mt-1">
+                    {selectedDoctorForModal.specialty}
+                  </p>
+                  {selectedDoctorForModal.roomNumber && (
+                    <p className="text-xs text-emerald-800 font-medium mt-1">
+                      OPD Location: {selectedDoctorForModal.roomNumber}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {selectedDoctorForModal.bio && (
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-[#0B6B4E] uppercase tracking-wider">Biography & Experience</h4>
+                  <p className="text-xs text-emerald-900/80 leading-relaxed font-medium bg-[#FAF8F3] p-3 rounded-xl border border-emerald-900/10">
+                    {selectedDoctorForModal.bio}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2 pt-2 text-xs text-emerald-800 border-t border-emerald-900/10">
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-medium">Consultation Days:</span>
+                  <span className="font-bold text-[#0B6B4E]">
+                    {Array.isArray(selectedDoctorForModal.availableDays)
+                      ? selectedDoctorForModal.availableDays.join(', ')
+                      : selectedDoctorForModal.availableDays || department.days || 'Mon - Sat'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-medium">Consultation Hours:</span>
+                  <span className="font-bold text-[#0B6B4E]">
+                    {selectedDoctorForModal.timing || department.timing || '09:00 AM - 05:00 PM'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="font-medium">Consultation Fee:</span>
+                  <span className="font-extrabold text-[#0B6B4E]">
+                    {selectedDoctorForModal.fee || department.fee || 'Rs. 1,000'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-emerald-900/10 bg-[#FAF8F3] flex items-center justify-end gap-3">
+              <button
+                onClick={() => setSelectedDoctorForModal(null)}
+                className="px-4 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const docId = selectedDoctorForModal.id;
+                  setSelectedDoctorForModal(null);
+                  handleOpenBooking(docId);
+                }}
+                className="px-5 py-2.5 bg-[#0B6B4E] text-white text-xs font-bold rounded-xl hover:bg-[#08523c] transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Book Appointment</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

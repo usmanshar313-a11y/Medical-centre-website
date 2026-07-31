@@ -7,13 +7,12 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle, 
-  Printer, 
   Phone, 
   Heart, 
   Plus, 
   Bell,
   LogOut,
-  ShieldAlert
+  ExternalLink
 } from 'lucide-react';
 import { 
   collection, 
@@ -33,12 +32,9 @@ export const PortalPage: React.FC = () => {
   const { user, patientProfile, loading, signInWithGoogle, updatePatientProfile, logout } = useAuth();
   const { t } = useLanguage();
 
-  const [activeTab, setActiveTab] = useState<'appointments' | 'book' | 'profile'>('appointments');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'profile'>('appointments');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-
-  // Print modal
-  const [selectedPrintAppt, setSelectedPrintAppt] = useState<Appointment | null>(null);
 
   // Profile Edit Form State
   const [profileName, setProfileName] = useState('');
@@ -72,30 +68,28 @@ export const PortalPage: React.FC = () => {
     if (!user) return;
     setLoadingData(true);
     try {
-      // Fetch Appointments by patientId
+      // Fetch Appointments by patientId & email
       const apptQ = query(collection(db, 'appointments'), where('patientId', '==', user.uid));
       const apptSnap = await getDocs(apptQ);
       const fetchedAppts: Appointment[] = [];
-      const seenIds = new Set<string>();
+      const seenApptIds = new Set<string>();
 
       apptSnap.forEach((d) => {
-        seenIds.add(d.id);
+        seenApptIds.add(d.id);
         fetchedAppts.push({ id: d.id, ...d.data() } as Appointment);
       });
 
-      // Also query by user email if available
       if (user.email) {
         const apptQ2 = query(collection(db, 'appointments'), where('email', '==', user.email));
         const apptSnap2 = await getDocs(apptQ2);
         apptSnap2.forEach((d) => {
-          if (!seenIds.has(d.id)) {
-            seenIds.add(d.id);
+          if (!seenApptIds.has(d.id)) {
+            seenApptIds.add(d.id);
             fetchedAppts.push({ id: d.id, ...d.data() } as Appointment);
           }
         });
       }
 
-      // Sort client-side by creation date
       fetchedAppts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setAppointments(fetchedAppts);
     } catch (err) {
@@ -305,14 +299,6 @@ export const PortalPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setBookingModalOpen(true)}
-            className="flex-1 min-w-[120px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 bg-[#D64545] hover:bg-[#c23737] text-white transition-colors cursor-pointer shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Book New Appointment</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('profile')}
             className={`flex-1 min-w-[120px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
               activeTab === 'profile'
@@ -396,21 +382,13 @@ export const PortalPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-emerald-900/10 gap-2">
-                        <button
-                          onClick={() => setSelectedPrintAppt(appt)}
-                          className="bg-emerald-900/10 hover:bg-emerald-900/20 text-[#0B6B4E] font-bold text-xs py-2 px-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Print Receipt</span>
-                        </button>
-
+                      <div className="flex items-center justify-end pt-3 border-t border-emerald-900/10 gap-2">
                         {appt.status !== 'cancelled' && appt.status !== 'completed' && (
                           <button
                             onClick={() => handleCancelAppointment(appt.id)}
-                            className="text-red-600 hover:text-red-800 font-bold text-xs py-1 px-2 transition-colors cursor-pointer"
+                            className="text-red-600 hover:text-red-800 font-bold text-xs py-1 px-3 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl transition-colors cursor-pointer"
                           >
-                            Cancel
+                            Cancel Appointment
                           </button>
                         )}
                       </div>
@@ -522,75 +500,6 @@ export const PortalPage: React.FC = () => {
           fetchPatientData();
         }}
       />
-
-      {/* Printable Appointment Receipt Slip Modal */}
-      {selectedPrintAppt && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white text-gray-900 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 font-sans">
-            <div className="text-center border-b pb-4 space-y-1">
-              <h3 className="font-bold text-lg text-[#0B6B4E]">
-                Rafah-E-Aam Medical Center
-              </h3>
-              <p className="text-xs text-gray-600">
-                St-10, Block 13, Gulberg Town, Karachi • Phone: +92 21 36342011
-              </p>
-              <div className="text-xs font-bold bg-emerald-100 text-[#0B6B4E] py-1 px-3 rounded-full inline-block mt-1">
-                Appointment Confirmation Slip
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Patient Name:</span>
-                <span className="font-bold">{selectedPrintAppt.patientName}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Phone:</span>
-                <span className="font-bold">{selectedPrintAppt.phone}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Department / Service:</span>
-                <span className="font-bold">{selectedPrintAppt.service}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Doctor:</span>
-                <span className="font-bold">{selectedPrintAppt.doctorName || 'Duty Specialist'}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Scheduled Date:</span>
-                <span className="font-bold">{selectedPrintAppt.preferredDate}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Time Slot:</span>
-                <span className="font-bold">{selectedPrintAppt.preferredTime}</span>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Status:</span>
-                <span className="font-bold uppercase text-[#0B6B4E]">{selectedPrintAppt.status}</span>
-              </div>
-            </div>
-
-            <div className="text-[10px] text-gray-500 text-center pt-2">
-              Please present this confirmation slip or booking ID at the hospital reception desk upon arrival.
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 bg-[#0B6B4E] text-white py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1"
-              >
-                <Printer className="w-4 h-4" /> Print
-              </button>
-              <button
-                onClick={() => setSelectedPrintAppt(null)}
-                className="bg-gray-200 text-gray-800 py-2 px-4 rounded-xl font-bold text-xs"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

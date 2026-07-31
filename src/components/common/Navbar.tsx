@@ -7,7 +7,8 @@ import {
   Menu, 
   X, 
   ChevronDown,
-  HeartPulse
+  HeartPulse,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -23,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleNavClick = (type: 'home' | 'departments' | 'about' | 'contact') => {
+  const handleNavClick = (type: 'home' | 'departments' | 'about' | 'contact' | 'admin') => {
     setMobileMenuOpen(false);
     if (type === 'home') {
       navigate('/');
@@ -34,12 +35,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
       navigate('/about');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (type === 'contact') {
-      if (location.pathname !== '/') {
-        navigate('/#location');
-      } else {
-        const el = document.querySelector('#location');
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }
+      navigate('/contact');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (type === 'admin') {
+      navigate('/admin');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -91,9 +91,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
             </button>
             <button 
               onClick={() => handleNavClick('contact')} 
-              className="hover:text-amber-200 transition-colors cursor-pointer py-1"
+              className={`hover:text-amber-200 transition-colors cursor-pointer py-1 ${
+                location.pathname.startsWith('/contact') ? 'text-white border-b-2 border-amber-300' : ''
+              }`}
             >
               Contact
+            </button>
+            <button 
+              onClick={() => handleNavClick('admin')} 
+              className={`hover:text-amber-200 transition-colors cursor-pointer py-1 flex items-center gap-1.5 ${
+                location.pathname.startsWith('/admin') ? 'text-white border-b-2 border-amber-300' : ''
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-300" />
+              <span>Admin</span>
             </button>
           </nav>
 
@@ -210,6 +221,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenBooking }) => {
               className="text-left py-1 hover:text-white font-bold flex items-center justify-between"
             >
               <span>Contact</span>
+            </button>
+            <button
+              onClick={() => handleNavClick('admin')}
+              className="text-left py-1 hover:text-white font-bold flex items-center justify-between text-amber-200"
+            >
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-300" />
+                Admin Portal
+              </span>
             </button>
           </nav>
 

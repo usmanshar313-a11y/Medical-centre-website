@@ -77,15 +77,41 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       tomorrow.setDate(tomorrow.getDate() + 1);
       setPreferredDate(tomorrow.toISOString().split('T')[0]);
 
-      if (preselectedDoctorId) setDoctorId(preselectedDoctorId);
-      if (preselectedServiceId) setService(preselectedServiceId);
-
       setConfirmedDetails(false);
+
+      const targetDocId = preselectedDoctorId || '';
+      setDoctorId(targetDocId);
+
+      // Auto-determine department / service if doctor is selected
+      const allAvailableDocs = doctors.length > 0 ? doctors : ALL_DOCTORS;
+      const matchedDoc = allAvailableDocs.find((d) => d.id === targetDocId) || ALL_DOCTORS.find((d) => d.id === targetDocId);
+
+      let targetServiceId = preselectedServiceId || '';
+      if (!targetServiceId && matchedDoc) {
+        const servList = services.length > 0 ? services : DEFAULT_SERVICES;
+        const matchingServ = servList.find((s) => {
+          if (matchedDoc.departmentId && s.id === matchedDoc.departmentId) return true;
+          if (matchedDoc.departmentId && s.department === matchedDoc.departmentId) return true;
+          const sName = s.name.toLowerCase();
+          const dSpec = (matchedDoc.specialty || '').toLowerCase();
+          return sName.includes(dSpec) || dSpec.includes(sName);
+        });
+
+        if (matchingServ) {
+          targetServiceId = matchingServ.id;
+        } else if (matchedDoc.departmentId) {
+          targetServiceId = matchedDoc.departmentId;
+        }
+      }
+
+      setService(targetServiceId);
       fetchMetadata();
     } else {
       setSubmitted(false);
       setErrorMsg('');
       setConfirmedDetails(false);
+      setDoctorId('');
+      setService('');
     }
   }, [isOpen, user, patientProfile, preselectedDoctorId, preselectedServiceId]);
 

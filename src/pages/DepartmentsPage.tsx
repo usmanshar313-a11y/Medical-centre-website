@@ -17,7 +17,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Department } from '../types';
 import { DEPARTMENTS_DATA } from '../data/departmentsData';
-import { DepartmentLottieIcon } from '../components/common/DepartmentLottieIcon';
+import { DepartmentIcon, getDepartmentTheme } from '../components/common/DepartmentIcon';
 
 export { DEPARTMENTS_DATA };
 
@@ -44,19 +44,35 @@ export const DepartmentsPage: React.FC = () => {
     }
   }, [searchTerm, setSearchParams]);
 
-  // GSAP Entrance animation
+  // GSAP Entrance animation for department cards & hero elements
   useEffect(() => {
     window.scrollTo(0, 0);
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
     const ctx = gsap.context(() => {
       gsap.fromTo(
+        '.dept-hero-content',
+        { opacity: 0, y: -20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }
+      );
+
+      gsap.fromTo(
+        '.dept-search-bar',
+        { opacity: 0, y: 15 },
+        { opacity: 1, y: 0, duration: 0.4, delay: 0.1, ease: 'power2.out' }
+      );
+
+      gsap.fromTo(
         '.dept-card',
-        { opacity: 0, y: 20 },
+        { opacity: 0, y: 25, scale: 0.98 },
         {
           opacity: 1,
           y: 0,
-          duration: 0.4,
-          stagger: 0.04,
+          scale: 1,
+          duration: 0.45,
+          stagger: 0.05,
           ease: 'power2.out',
         }
       );
@@ -98,7 +114,7 @@ export const DepartmentsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
 
         {/* Hero Banner Section */}
-        <div className="bg-gradient-to-r from-[#0B6B4E] via-[#08523c] to-[#053b2b] text-white rounded-3xl p-7 sm:p-12 shadow-sm relative overflow-hidden">
+        <div className="dept-hero-content bg-gradient-to-r from-[#0B6B4E] via-[#08523c] to-[#053b2b] text-white rounded-3xl p-7 sm:p-12 shadow-xs relative overflow-hidden">
           <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
           <div className="max-w-3xl space-y-3 sm:space-y-4 relative z-10">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-xs font-extrabold uppercase tracking-wider text-amber-300">
@@ -109,13 +125,13 @@ export const DepartmentsPage: React.FC = () => {
               Medical Departments & Specialists
             </h1>
             <p className="text-xs sm:text-base text-emerald-100 font-medium leading-relaxed max-w-2xl">
-              Browse our medical departments below. Click "Show Doctors" on any department to view consulting specialists, schedule, and book visits.
+              Select a specialized medical department below to view consulting doctors, OPD schedules, room locations, and book your visit directly.
             </p>
           </div>
         </div>
 
-        {/* Search & Filter Controls (Uncluttered, Single Dropdown/Popup Button) */}
-        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-emerald-900/10 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+        {/* Search & Filter Controls */}
+        <div className="dept-search-bar bg-white p-4 sm:p-6 rounded-2xl border border-emerald-900/10 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
           
           {/* Text Search Input */}
           <div className="relative flex-1">
@@ -137,7 +153,7 @@ export const DepartmentsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Department Filter Trigger Button */}
+          {/* Department Filter Dropdown/Popup Button */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setIsFilterModalOpen(true)}
@@ -195,7 +211,7 @@ export const DepartmentsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Department Summary Cards Grid (Clean, Deliberate Whitespace, Single Primary CTA) */}
+        {/* Department Cards List (Horizontal Expanded on Desktop/Laptop, Vertical Stack on Mobile) */}
         {filteredDepartments.length === 0 ? (
           <div className="bg-white p-10 sm:p-12 rounded-3xl border border-emerald-900/10 text-center space-y-4">
             <p className="text-base font-bold text-[#0B6B4E]">No matching medical departments found</p>
@@ -211,67 +227,79 @@ export const DepartmentsPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {filteredDepartments.map((dept) => (
-              <div
-                key={dept.id}
-                className="dept-card bg-white rounded-3xl border border-emerald-900/15 shadow-2xs hover:shadow-md hover:border-[#0B6B4E]/40 transition-all p-6 sm:p-7 flex flex-col justify-between space-y-6 group"
-              >
-                <div className="space-y-4">
-                  {/* Department Card Header: Lottie Icon + Title */}
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-[#FAF8F3] group-hover:bg-emerald-50 rounded-2xl border border-emerald-900/10 transition-colors shrink-0">
-                      <DepartmentLottieIcon iconType={dept.icon} size={44} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="font-heading font-extrabold text-lg sm:text-xl text-[#0B6B4E] leading-snug group-hover:text-[#08523c] transition-colors">
-                        {dept.name}
-                      </h2>
-                      <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                        <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>{dept.doctors.length} Specialist{dept.doctors.length === 1 ? '' : 's'}</span>
+          <div className="grid grid-cols-1 gap-6 sm:gap-7">
+            {filteredDepartments.map((dept) => {
+              const theme = getDepartmentTheme(dept.id);
+
+              return (
+                <div
+                  key={dept.id}
+                  className="dept-card bg-white rounded-3xl border border-emerald-900/15 shadow-2xs hover:shadow-md hover:border-[#0B6B4E]/40 transition-all flex flex-col lg:flex-row overflow-hidden group"
+                >
+                  {/* Left / Upper Block: Tinted Header Zone with Department Icon, Name & Specialist Badge */}
+                  <div className={`p-6 sm:p-7 ${theme.bgTint} border-b lg:border-b-0 lg:border-r ${theme.borderTint} flex flex-col justify-between space-y-4 shrink-0 lg:w-[300px] xl:w-[340px]`}>
+                    <div className="flex items-start gap-4">
+                      {/* Department Icon with matching specialty color */}
+                      <div className={`p-3.5 bg-white rounded-2xl border ${theme.borderTint} shadow-2xs shrink-0 ${theme.iconColor}`}>
+                        <DepartmentIcon iconType={dept.icon} deptId={dept.id} className="w-7 h-7" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="font-heading font-extrabold text-lg sm:text-xl text-[#0B6B4E] leading-snug group-hover:text-[#08523c] transition-colors">
+                          {dept.name}
+                        </h2>
+                        <div className={`mt-2 inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border border-black/5 ${theme.badgeBg} ${theme.badgeText}`}>
+                          <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                          <span>{dept.doctors.length} Specialist{dept.doctors.length === 1 ? '' : 's'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <p className="text-xs sm:text-sm text-emerald-900/80 font-medium leading-relaxed line-clamp-3">
-                    {dept.description}
-                  </p>
+                  {/* Middle Block: Description Text */}
+                  <div className="p-6 sm:p-7 flex-1 flex flex-col justify-center space-y-2">
+                    <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800/60 hidden lg:block">
+                      Department Overview
+                    </h4>
+                    <p className="text-xs sm:text-sm text-emerald-900/85 font-medium leading-relaxed">
+                      {dept.description}
+                    </p>
+                  </div>
 
-                  {/* Schedule Metadata */}
-                  <div className="space-y-2 pt-3 border-t border-emerald-900/10 text-xs text-emerald-800">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Days:
-                      </span>
-                      <span className="font-bold text-[#0B6B4E]">{dept.days || 'Mon - Sat'}</span>
+                  {/* Right / Schedule Block: Days, Timings, Fee & Show Doctors CTA */}
+                  <div className="p-6 sm:p-7 bg-[#FAF8F3]/60 border-t lg:border-t-0 lg:border-l border-emerald-900/10 flex flex-col justify-between space-y-5 lg:w-[290px] xl:w-[310px] shrink-0">
+                    <div className="space-y-2.5 text-xs text-emerald-800">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Days:
+                        </span>
+                        <span className="font-bold text-[#0B6B4E]">{dept.days || 'Mon - Sat'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600" /> Timing:
+                        </span>
+                        <span className="font-bold text-[#0B6B4E]">{dept.timing || '09:00 AM - 05:00 PM'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <Banknote className="w-3.5 h-3.5 text-emerald-600" /> Fee:
+                        </span>
+                        <span className="font-extrabold text-[#0B6B4E]">{dept.fee || 'Rs. 1,000'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Clock className="w-3.5 h-3.5 text-emerald-600" /> Timing:
-                      </span>
-                      <span className="font-bold text-[#0B6B4E]">{dept.timing || '09:00 AM - 05:00 PM'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <Banknote className="w-3.5 h-3.5 text-emerald-600" /> Fee:
-                      </span>
-                      <span className="font-extrabold text-[#0B6B4E]">{dept.fee || 'Rs. 1,000'}</span>
-                    </div>
+
+                    {/* Primary Dedicated CTA Button -> Navigates to /departments/:departmentId */}
+                    <Link
+                      to={`/departments/${dept.id}`}
+                      className="w-full bg-[#0B6B4E] hover:bg-[#08523c] active:bg-[#064230] text-white py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer group/btn"
+                    >
+                      <span>Show Doctors</span>
+                      <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                    </Link>
                   </div>
                 </div>
-
-                {/* Primary Dedicated CTA Button -> Navigates to /departments/:departmentId */}
-                <Link
-                  to={`/departments/${dept.id}`}
-                  className="w-full bg-[#0B6B4E] hover:bg-[#08523c] active:bg-[#064230] text-white py-3.5 px-4 rounded-xl text-xs sm:text-sm font-bold shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer group/btn"
-                >
-                  <span>Show Doctors</span>
-                  <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -337,6 +365,7 @@ export const DepartmentsPage: React.FC = () => {
               {/* Specific Department Options */}
               {modalDepartments.map((dept) => {
                 const isSelected = selectedDeptId === dept.id;
+                const theme = getDepartmentTheme(dept.id);
                 return (
                   <button
                     key={dept.id}
@@ -350,8 +379,10 @@ export const DepartmentsPage: React.FC = () => {
                         : 'hover:bg-emerald-50 text-emerald-900'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <DepartmentLottieIcon iconType={dept.icon} size={28} />
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-1.5 rounded-lg border shrink-0 ${isSelected ? 'bg-white/20 text-white border-transparent' : `${theme.bgTint} ${theme.iconColor} ${theme.borderTint}`}`}>
+                        <DepartmentIcon iconType={dept.icon} deptId={dept.id} className="w-4 h-4" />
+                      </div>
                       <span className="truncate">{dept.name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -398,3 +429,4 @@ export const DepartmentsPage: React.FC = () => {
     </div>
   );
 };
+

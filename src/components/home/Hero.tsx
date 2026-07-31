@@ -35,21 +35,21 @@ export const Hero: React.FC<HeroProps> = () => {
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover object-center transform scale-105"
         />
-        {/* Refined, Light Overlay to Keep Image Bright & Visible while preserving crisp text contrast */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#032d20]/80 via-[#032d20]/50 to-transparent lg:via-[#032d20]/40" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#032d20]/70 via-transparent to-black/20" />
+        {/* Balanced Dark Overlay to Ensure Crisp Text Contrast Across Whole Section */}
+        <div className="absolute inset-0 bg-[#032d20]/70 sm:bg-[#032d20]/65" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#032d20]/80 via-transparent to-black/30" />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
-        <div className="max-w-3xl space-y-6 gsap-reveal text-center lg:text-left mx-auto lg:mx-0">
+        <div className="max-w-3xl space-y-6 gsap-reveal text-center mx-auto">
           
           <div className="space-y-4">
-            <span className="inline-flex items-center gap-2 text-emerald-200 font-extrabold text-xs sm:text-sm tracking-wider uppercase bg-emerald-950/70 border border-emerald-500/30 px-4 py-1.5 rounded-full backdrop-blur-md shadow-md">
+            <span className="inline-flex items-center gap-2 text-emerald-200 font-extrabold text-xs sm:text-sm tracking-wider uppercase bg-emerald-950/80 border border-emerald-500/30 px-4 py-1.5 rounded-full backdrop-blur-md shadow-md mx-auto">
               <Clock className="w-4 h-4 text-amber-300" />
               Compassionate Care, Available 24/7
             </span>
 
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.15] tracking-tight drop-shadow-sm">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.15] tracking-tight drop-shadow-sm text-center">
               Rafah-E-Aam Medical Centre
               <span className="text-amber-300 text-2xl sm:text-4xl lg:text-5xl font-extrabold block mt-2 sm:mt-3 drop-shadow">
                 General & Orthopedic
@@ -57,12 +57,12 @@ export const Hero: React.FC<HeroProps> = () => {
             </h1>
           </div>
 
-          <p className="text-emerald-100 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed drop-shadow-xs font-medium">
+          <p className="text-emerald-100 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto leading-relaxed drop-shadow-xs font-medium text-center">
             Trusted healthcare in Gulberg Town. Providing state-of-the-art OPD diagnostics, surgery, and maternal care with a human touch in our modern reception & clinical facilities.
           </p>
 
           {/* Action Buttons */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={() => {
                 navigate('/departments');
@@ -84,13 +84,13 @@ export const Hero: React.FC<HeroProps> = () => {
           </div>
 
           {/* Feature Badges */}
-          <div className="pt-4 border-t border-white/20 flex flex-wrap items-center justify-center lg:justify-start gap-3">
-            <div className="inline-flex items-center gap-2.5 bg-emerald-950/60 backdrop-blur-md px-4 py-2 rounded-full border border-emerald-400/30 text-white shadow-xs">
+          <div className="pt-4 border-t border-white/20 flex flex-wrap items-center justify-center gap-3">
+            <div className="inline-flex items-center gap-2.5 bg-emerald-950/70 backdrop-blur-md px-4 py-2 rounded-full border border-emerald-400/30 text-white shadow-xs">
               <Accessibility className="w-4 h-4 text-emerald-300 shrink-0" />
               <span className="text-xs sm:text-sm font-bold tracking-wide">Full Wheelchair Accessibility</span>
             </div>
 
-            <div className="inline-flex items-center gap-2 bg-emerald-950/60 backdrop-blur-md px-4 py-2 rounded-full border border-emerald-400/30 text-white shadow-xs">
+            <div className="inline-flex items-center gap-2 bg-emerald-950/70 backdrop-blur-md px-4 py-2 rounded-full border border-emerald-400/30 text-white shadow-xs">
               <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
               <span className="text-xs sm:text-sm font-bold tracking-wide">St-10, Block 13, Gulberg Town</span>
             </div>

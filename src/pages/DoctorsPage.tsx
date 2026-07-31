@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   UserCheck, 
@@ -10,9 +10,13 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { db } from '../firebase';
 import { Doctor } from '../types';
 import { BookingModal } from '../components/booking/BookingModal';
+
+gsap.registerPlugin(ScrollTrigger);
 
 const SAMPLE_DOCTORS: Doctor[] = [
   { id: 'doc-1', name: 'Dr. Ajmaal Jami', specialty: 'General Physician' },
@@ -65,6 +69,7 @@ export const DoctorsPage: React.FC = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('All');
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | undefined>(undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Sync state if URL search query changes
   useEffect(() => {
@@ -73,6 +78,70 @@ export const DoctorsPage: React.FC = () => {
       setSearchTerm(query);
     }
   }, [searchParams]);
+
+  // Specialties list
+  const specialtyFilters = [
+    'All',
+    'Physician',
+    'Cardiologist',
+    'Surgeon',
+    'Child Specialist',
+    'Gynaecologist',
+    'Orthopedic',
+    'Radiologist',
+    'Diabetologist',
+    'ENT'
+  ];
+
+  const filteredDoctors = doctors.filter((doc) => {
+    const matchSpecialtyPill =
+      selectedSpecialty === 'All' ||
+      doc.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase());
+
+    const term = searchTerm.toLowerCase().trim();
+    const matchSearch =
+      !term ||
+      doc.name.toLowerCase().includes(term) ||
+      doc.specialty.toLowerCase().includes(term) ||
+      (doc.bio && doc.bio.toLowerCase().includes(term));
+
+    return matchSpecialtyPill && matchSearch;
+  });
+
+  // GSAP Entrance Animation
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        '.doc-hero-banner',
+        { opacity: 0, y: -20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }
+      );
+
+      gsap.fromTo(
+        '.doc-search-bar',
+        { opacity: 0, y: 15 },
+        { opacity: 1, y: 0, duration: 0.4, delay: 0.1, ease: 'power2.out' }
+      );
+
+      gsap.fromTo(
+        '.doc-card',
+        { opacity: 0, y: 25, scale: 0.98 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.4,
+          stagger: 0.04,
+          ease: 'power2.out',
+        }
+      );
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, [filteredDoctors.length, selectedSpecialty]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -107,41 +176,12 @@ export const DoctorsPage: React.FC = () => {
     setBookingModalOpen(true);
   };
 
-  // Specialties list
-  const specialtyFilters = [
-    'All',
-    'Physician',
-    'Cardiologist',
-    'Surgeon',
-    'Child Specialist',
-    'Gynaecologist',
-    'Orthopedic',
-    'Radiologist',
-    'Diabetologist',
-    'ENT'
-  ];
-
-  const filteredDoctors = doctors.filter((doc) => {
-    const matchSpecialtyPill =
-      selectedSpecialty === 'All' ||
-      doc.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase());
-
-    const term = searchTerm.toLowerCase().trim();
-    const matchSearch =
-      !term ||
-      doc.name.toLowerCase().includes(term) ||
-      doc.specialty.toLowerCase().includes(term) ||
-      (doc.bio && doc.bio.toLowerCase().includes(term));
-
-    return matchSpecialtyPill && matchSearch;
-  });
-
   return (
-    <div className="bg-[#F5F1E8] min-h-screen py-10 text-[#0B6B4E]">
+    <div ref={containerRef} className="bg-[#F5F1E8] min-h-screen py-10 text-[#0B6B4E]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
         {/* Header */}
-        <div className="bg-[#0B6B4E] text-white p-8 rounded-3xl shadow-lg border border-emerald-800 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="doc-hero-banner bg-[#0B6B4E] text-white p-8 rounded-3xl shadow-lg border border-emerald-800 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl text-center md:text-left">
             <span className="bg-emerald-800 text-amber-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider inline-block">
               Specialist Medical Panel
@@ -161,7 +201,7 @@ export const DoctorsPage: React.FC = () => {
         </div>
 
         {/* Doctor Search Bar & Specialty Filter */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
+        <div className="doc-search-bar bg-white p-5 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
           <div className="flex flex-col md:flex-row items-center gap-4">
             <div className="relative flex-1 w-full">
               <Search className="w-5 h-5 text-emerald-700 absolute left-3.5 top-3.5" />
@@ -230,7 +270,7 @@ export const DoctorsPage: React.FC = () => {
             {filteredDoctors.map((doc) => (
               <div
                 key={doc.id}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-emerald-900/10 overflow-hidden flex flex-col justify-between"
+                className="doc-card bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-emerald-900/10 overflow-hidden flex flex-col justify-between"
               >
                 <div>
                   <div className="h-48 bg-emerald-100 relative overflow-hidden">

@@ -1,77 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  Lock, 
-  Mail, 
-  Key, 
+import {
+  Building2,
+  Mail,
   Shield,
   ShieldAlert,
-  LogOut, 
-  Calendar, 
-  UserCheck, 
-  Stethoscope, 
-  FileText, 
-  Star, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  Check, 
-  X, 
-  Database, 
-  Clock, 
-  Upload, 
-  Users, 
+  LogOut,
+  Calendar,
+  Stethoscope,
+  FileText,
+  Plus,
+  Edit3,
+  Trash2,
+  Check,
+  X,
+  Database,
+  Clock,
   Search,
-  Filter,
   CheckCircle2,
   AlertCircle,
-  Send,
-  MessageSquare,
-  Smartphone,
-  MailCheck,
-  BellRing,
   Download,
   FileSpreadsheet,
   CalendarDays,
-  SlidersHorizontal
+  SlidersHorizontal,
 } from 'lucide-react';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
   onAuthStateChanged,
-  User 
+  User,
 } from 'firebase/auth';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  addDoc, 
-  query, 
-  where 
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { Appointment, Doctor, Service, Review, Patient, MedicalReport, AppointmentStatus } from '../types';
-
-export interface DispatchNotification {
-  id: string;
-  appointmentId: string;
-  patientName: string;
-  phone: string;
-  email: string;
-  service: string;
-  date: string;
-  time: string;
-  doctorName?: string;
-  timestamp: string;
-  smsBody: string;
-  emailSubject: string;
-  emailBody: string;
-  status: 'sent' | 'simulated';
-}
+import { Appointment, Doctor, Review, Patient, AppointmentStatus } from '../types';
 
 const RAW_SECRET_KEY = ((import.meta as any).env?.VITE_ADMIN_SECRET_KEY || '@As"{sd34%Da{sad-').trim();
 const CLEAN_SECRET_KEY = RAW_SECRET_KEY.replace(/^['"]|['"]$/g, '').trim();
@@ -165,14 +133,12 @@ export const AdminApp: React.FC = () => {
   // Admin Data Collections
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]); // kept only to power the "Registered Patients" stat card
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [reports, setReports] = useState<MedicalReport[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // Active Admin Tab
-  const [activeTab, setActiveTab] = useState<'appointments' | 'doctors' | 'services' | 'patients' | 'reviews'>('appointments');
+  // Active Admin Tab (Services and Patients & Reports removed)
+  const [activeTab, setActiveTab] = useState<'appointments' | 'doctors' | 'reviews'>('appointments');
 
   // Filter & Search
   const [apptStatusFilter, setApptStatusFilter] = useState<string>('all');
@@ -203,40 +169,13 @@ export const AdminApp: React.FC = () => {
   const [docDays, setDocDays] = useState('');
   const [docRoom, setDocRoom] = useState('');
 
-  // Patient Report Upload Modal & Deletion Selection State
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [reportFileName, setReportFileName] = useState('');
-  const [reportFileUrl, setReportFileUrl] = useState('');
-  const [reportUploadSuccess, setReportUploadSuccess] = useState('');
-
-  // Patient Manual Selection & Deletion State
-  const [selectedPatientUids, setSelectedPatientUids] = useState<string[]>([]);
-  const [patientSearchQuery, setPatientSearchQuery] = useState<string>('');
-  const [deletingPatients, setDeletingPatients] = useState<boolean>(false);
-
   // Appointment Manual Selection & Deletion State
   const [selectedApptIds, setSelectedApptIds] = useState<string[]>([]);
   const [deletingAppts, setDeletingAppts] = useState<boolean>(false);
+  const [deleteErrorMsg, setDeleteErrorMsg] = useState<string>('');
 
   // Seed Status Notification
   const [seedSuccessMsg, setSeedSuccessMsg] = useState('');
-
-  // Dispatched Alert Notifications (SMS & Email simulation)
-  const [dispatchedAlerts, setDispatchedAlerts] = useState<DispatchNotification[]>([]);
-  const [activeToastAlert, setActiveToastAlert] = useState<DispatchNotification | null>(null);
-  const [showLogsModal, setShowLogsModal] = useState(false);
-  const [selectedDetailAlert, setSelectedDetailAlert] = useState<DispatchNotification | null>(null);
-
-  // Cancel Appointment Modal & Custom SMS State
-  const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
-  const [cancelMessage, setCancelMessage] = useState<string>('');
-  const [cancelValidationError, setCancelValidationError] = useState<string>('');
-  const [cancelSubmitting, setCancelSubmitting] = useState<boolean>(false);
-  const [cancelToastAlert, setCancelToastAlert] = useState<{
-    type: 'success' | 'warning' | 'error';
-    title: string;
-    message: string;
-  } | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (usr) => {
@@ -385,7 +324,7 @@ export const AdminApp: React.FC = () => {
 
   const fetchAllAdminData = async () => {
     setDataLoading(true);
-    
+
     // Appointments
     try {
       const apptSnap = await getDocs(collection(db, 'appointments'));
@@ -394,7 +333,7 @@ export const AdminApp: React.FC = () => {
       apptList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setAppointments(apptList);
     } catch (err) {
-      console.warn('Error fetching appointments:', err);
+      console.error('Error fetching appointments:', err);
     }
 
     // Doctors
@@ -404,27 +343,17 @@ export const AdminApp: React.FC = () => {
       docSnap.forEach((d) => docList.push({ id: d.id, ...d.data() } as Doctor));
       setDoctors(docList);
     } catch (err) {
-      console.warn('Error fetching doctors:', err);
+      console.error('Error fetching doctors:', err);
     }
 
-    // Services
-    try {
-      const servSnap = await getDocs(collection(db, 'services'));
-      const servList: Service[] = [];
-      servSnap.forEach((s) => servList.push({ id: s.id, ...s.data() } as Service));
-      setServices(servList);
-    } catch (err) {
-      console.warn('Error fetching services:', err);
-    }
-
-    // Patients
+    // Patients (kept minimal — only used for the "Registered Patients" stat card)
     try {
       const patSnap = await getDocs(collection(db, 'patients'));
       const patList: Patient[] = [];
       patSnap.forEach((p) => patList.push({ ...p.data(), uid: p.id } as Patient));
       setPatients(patList);
     } catch (err) {
-      console.warn('Error fetching patients:', err);
+      console.error('Error fetching patients:', err);
     }
 
     // Reviews
@@ -434,209 +363,21 @@ export const AdminApp: React.FC = () => {
       revSnap.forEach((r) => revList.push({ id: r.id, ...r.data() } as Review));
       setReviews(revList);
     } catch (err) {
-      console.warn('Error fetching reviews:', err);
-    }
-
-    // Reports
-    try {
-      const repSnap = await getDocs(collection(db, 'reports'));
-      const repList: MedicalReport[] = [];
-      repSnap.forEach((rp) => repList.push({ id: rp.id, ...rp.data() } as MedicalReport));
-      setReports(repList);
-    } catch (err) {
-      console.warn('Error fetching reports:', err);
-    }
-
-    // Notifications (Sent SMS & Email Confirmation Logs)
-    try {
-      const notifSnap = await getDocs(collection(db, 'notifications'));
-      const notifList: DispatchNotification[] = [];
-      notifSnap.forEach((n) => notifList.push({ id: n.id, ...n.data() } as DispatchNotification));
-      notifList.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-      setDispatchedAlerts(notifList);
-    } catch (err) {
-      console.warn('Error fetching notifications:', err);
+      console.error('Error fetching reviews:', err);
     } finally {
       setDataLoading(false);
     }
   };
 
-  const sendConfirmationAlert = async (appt: Appointment) => {
-    const patientEmail = appt.email || `${appt.patientName.toLowerCase().replace(/\s+/g, '')}@patient.com`;
-    const formattedRef = (appt.id || 'REF123').slice(0, 8).toUpperCase();
-    const smsMessage = `[Rafah-E-Aam Medical] Dear ${appt.patientName}, your appointment for ${appt.service} on ${appt.preferredDate} at ${appt.preferredTime} is CONFIRMED. Ref ID: #${formattedRef}. Hotline: +92 300 1234567`;
-    const emailSubj = `Appointment Confirmation - ${appt.service} | Rafah-E-Aam Medical Center`;
-    const emailMsg = `Dear ${appt.patientName},\n\nYour appointment request at Rafah-E-Aam Medical Center has been CONFIRMED by hospital administration.\n\nAPPOINTMENT DETAILS:\n• Patient Name: ${appt.patientName}\n• Service / Specialty: ${appt.service}\n• Attending Specialist: ${appt.doctorName || 'Duty Specialist'}\n• Date: ${appt.preferredDate}\n• Time Slot: ${appt.preferredTime}\n• Reference Code: #${formattedRef}\n\nLOCATION:\nRafah-E-Aam Medical Center, Main OPD Wing, Stadium Road, Karachi.\n\nINSTRUCTIONS:\n- Please present your Reference Code at the registration desk upon arrival.\n- Arrive 10-15 minutes prior to your time slot.\n\nThank you for choosing Rafah-E-Aam Medical Center.`;
-
-    const newAlert: DispatchNotification = {
-      id: `alert-${Date.now()}`,
-      appointmentId: appt.id,
-      patientName: appt.patientName,
-      phone: appt.phone,
-      email: patientEmail,
-      service: appt.service,
-      date: appt.preferredDate,
-      time: appt.preferredTime,
-      doctorName: appt.doctorName,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      smsBody: smsMessage,
-      emailSubject: emailSubj,
-      emailBody: emailMsg,
-      status: 'sent',
-    };
-
-    try {
-      await addDoc(collection(db, 'notifications'), {
-        ...newAlert,
-        createdAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.warn('Could not save notification to Firestore:', err);
-    }
-
-    setActiveToastAlert(newAlert);
-    setDispatchedAlerts((prev) => [newAlert, ...prev]);
-  };
-
   const handleUpdateApptStatus = async (apptId: string, status: AppointmentStatus) => {
-    if (status === 'cancelled') {
-      const target = appointments.find((a) => a.id === apptId);
-      if (target) {
-        openCancelModal(target);
-        return;
-      }
-    }
-
     try {
       await updateDoc(doc(db, 'appointments', apptId), { status });
-      const targetAppt = appointments.find((a) => a.id === apptId);
-
       setAppointments((prev) =>
         prev.map((a) => (a.id === apptId ? { ...a, status } : a))
       );
-
-      if (status === 'confirmed' && targetAppt) {
-        await sendConfirmationAlert({ ...targetAppt, status: 'confirmed' });
-      }
-    } catch (err) {
-      console.error('Failed to update status:', err);
-    }
-  };
-
-  const openCancelModal = (appt: Appointment) => {
-    setCancellingAppt(appt);
-    setCancelMessage(
-      `Dear ${appt.patientName}, your appointment for ${appt.service} on ${appt.preferredDate} at ${appt.preferredTime} has been cancelled. Doctor is unavailable today, please reschedule.`
-    );
-    setCancelValidationError('');
-  };
-
-  const handleConfirmCancelAppointment = async () => {
-    if (!cancellingAppt) return;
-
-    const trimmedMsg = cancelMessage.trim();
-    if (!trimmedMsg) {
-      setCancelValidationError('Please enter a message before sending.');
-      return;
-    }
-
-    setCancelSubmitting(true);
-    setCancelValidationError('');
-
-    const targetPhone = cancellingAppt.phone || cancellingAppt.patientPhone || '';
-
-    try {
-      let smsResultSuccess = false;
-      let smsResultError = '';
-
-      // Check placeholder credentials or attempt SMS dispatch
-      try {
-        const ACCOUNT_SID = "YOUR_ACCOUNT_SID_HERE";
-        if (ACCOUNT_SID.includes("YOUR_ACCOUNT_SID")) {
-          throw new Error("Twilio SMS credentials (ACCOUNT_SID) contain placeholder defaults.");
-        }
-        smsResultSuccess = true;
-      } catch (smsErr: any) {
-        console.warn('SMS dispatch error:', smsErr);
-        smsResultError = smsErr?.message || 'SMS failed to send';
-      }
-
-      const updatePayload = {
-        status: 'cancelled' as const,
-        cancellationMessage: trimmedMsg,
-        patientPhone: targetPhone,
-        smsSent: smsResultSuccess,
-        smsSentAt: smsResultSuccess ? new Date().toISOString() : null,
-        smsError: smsResultSuccess ? null : smsResultError,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await updateDoc(doc(db, 'appointments', cancellingAppt.id), updatePayload);
-
-      setAppointments((prev) =>
-        prev.map((a) =>
-          a.id === cancellingAppt.id
-            ? {
-                ...a,
-                status: 'cancelled',
-                cancellationMessage: trimmedMsg,
-                patientPhone: targetPhone,
-                smsSent: smsResultSuccess,
-                smsSentAt: smsResultSuccess ? new Date().toISOString() : undefined,
-                smsError: smsResultSuccess ? undefined : smsResultError,
-              }
-            : a
-        )
-      );
-
-      // Save to notification log
-      const cancelAlert: DispatchNotification = {
-        id: `cancel-${Date.now()}`,
-        appointmentId: cancellingAppt.id,
-        patientName: cancellingAppt.patientName,
-        phone: targetPhone,
-        email: cancellingAppt.email || 'N/A',
-        service: cancellingAppt.service,
-        date: cancellingAppt.preferredDate,
-        time: cancellingAppt.preferredTime,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        smsBody: trimmedMsg,
-        emailSubject: `Appointment Cancellation Notice - Rafah-E-Aam Medical Center`,
-        emailBody: `Dear ${cancellingAppt.patientName},\n\nYour appointment for ${cancellingAppt.service} on ${cancellingAppt.preferredDate} at ${cancellingAppt.preferredTime} has been CANCELLED.\n\nReason / Message:\n${trimmedMsg}\n\nFor assistance, please contact us.`,
-        status: smsResultSuccess ? 'sent' : 'simulated',
-      };
-
-      try {
-        await addDoc(collection(db, 'notifications'), {
-          ...cancelAlert,
-          createdAt: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.warn('Could not save notification log:', err);
-      }
-
-      setDispatchedAlerts((prev) => [cancelAlert, ...prev]);
-
-      if (smsResultSuccess) {
-        setCancelToastAlert({
-          type: 'success',
-          title: 'Appointment Cancelled & SMS Sent',
-          message: `Appointment for ${cancellingAppt.patientName} was cancelled and SMS was sent to ${targetPhone}.`,
-        });
-      } else {
-        setCancelToastAlert({
-          type: 'warning',
-          title: 'Cancellation saved',
-          message: 'Cancellation saved, but SMS failed to send — please contact patient manually.',
-        });
-      }
-
-      setCancellingAppt(null);
     } catch (err: any) {
-      console.error('Failed to cancel appointment:', err);
-      setCancelValidationError(`Error saving cancellation: ${err.message || 'Firestore write failed'}`);
-    } finally {
-      setCancelSubmitting(false);
+      console.error('Failed to update appointment status:', err);
+      alert(`Failed to update appointment status: ${err?.message || 'Unknown error. Check Firestore permissions.'}`);
     }
   };
 
@@ -662,8 +403,9 @@ export const AdminApp: React.FC = () => {
       }
       setDoctorModalOpen(false);
       fetchAllAdminData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving doctor:', err);
+      alert(`Failed to save doctor: ${err?.message || 'Unknown error.'}`);
     }
   };
 
@@ -672,8 +414,9 @@ export const AdminApp: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'doctors', docId));
       setDoctors((prev) => prev.filter((d) => d.id !== docId));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete doctor:', err);
+      alert(`Failed to delete doctor: ${err?.message || 'Unknown error. Check Firestore permissions.'}`);
     }
   };
 
@@ -683,8 +426,9 @@ export const AdminApp: React.FC = () => {
       setReviews((prev) =>
         prev.map((r) => (r.id === revId ? { ...r, approved: true } : r))
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to approve review:', err);
+      alert(`Failed to approve review: ${err?.message || 'Unknown error.'}`);
     }
   };
 
@@ -692,124 +436,13 @@ export const AdminApp: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'reviews', revId));
       setReviews((prev) => prev.filter((r) => r.id !== revId));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete review:', err);
+      alert(`Failed to delete review: ${err?.message || 'Unknown error. Check Firestore permissions.'}`);
     }
   };
 
-  const handleUploadPatientReport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPatient || !reportFileName || !reportFileUrl) return;
-
-    try {
-      const newReport = {
-        patientId: selectedPatient.uid,
-        patientName: selectedPatient.name,
-        fileName: reportFileName,
-        fileUrl: reportFileUrl,
-        uploadedBy: 'admin' as const,
-        uploadedAt: new Date().toISOString(),
-      };
-      await addDoc(collection(db, 'reports'), newReport);
-      setReportUploadSuccess(`Report attached to ${selectedPatient.name}!`);
-      setReportFileName('');
-      setReportFileUrl('');
-      fetchAllAdminData();
-    } catch (err) {
-      console.error('Failed to upload report:', err);
-    }
-  };
-
-  // Patient Selection & Deletion Logic
-  const handleToggleSelectPatient = (uid: string) => {
-    setSelectedPatientUids((prev) =>
-      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
-    );
-  };
-
-  const handleSelectAllPatients = (targetList: Patient[]) => {
-    const targetUids = targetList.map((p) => p.uid);
-    const allSelected = targetUids.length > 0 && targetUids.every((uid) => selectedPatientUids.includes(uid));
-
-    if (allSelected) {
-      setSelectedPatientUids((prev) => prev.filter((uid) => !targetUids.includes(uid)));
-    } else {
-      const newUids = Array.from(new Set([...selectedPatientUids, ...targetUids]));
-      setSelectedPatientUids(newUids);
-    }
-  };
-
-  const handleDeleteSinglePatient = async (p: Patient) => {
-    if (!window.confirm(`Are you sure you want to delete the patient record for "${p.name}"?`)) return;
-
-    setDeletingPatients(true);
-    try {
-      await deleteDoc(doc(db, 'patients', p.uid));
-      setPatients((prev) => prev.filter((item) => item.uid !== p.uid));
-      setSelectedPatientUids((prev) => prev.filter((id) => id !== p.uid));
-      if (selectedPatient?.uid === p.uid) {
-        setSelectedPatient(null);
-      }
-    } catch (err) {
-      console.error('Failed to delete patient:', err);
-      alert('Failed to delete patient record from database.');
-    } finally {
-      setDeletingPatients(false);
-    }
-  };
-
-  const handleDeleteSelectedPatients = async () => {
-    if (selectedPatientUids.length === 0) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the ${selectedPatientUids.length} selected patient profile(s)? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
-    setDeletingPatients(true);
-    try {
-      const deletePromises = selectedPatientUids.map((uid) => deleteDoc(doc(db, 'patients', uid)));
-      await Promise.all(deletePromises);
-
-      setPatients((prev) => prev.filter((p) => !selectedPatientUids.includes(p.uid)));
-      if (selectedPatient && selectedPatientUids.includes(selectedPatient.uid)) {
-        setSelectedPatient(null);
-      }
-      setSelectedPatientUids([]);
-    } catch (err) {
-      console.error('Failed to delete selected patients:', err);
-      alert('Failed to delete selected patient records.');
-    } finally {
-      setDeletingPatients(false);
-    }
-  };
-
-  const handleDeleteAllPatients = async () => {
-    if (patients.length === 0) return;
-    const confirmed = window.confirm(
-      `⚠️ CRITICAL WARNING: Are you sure you want to delete ALL ${patients.length} patient profiles from the database?\n\nThis will permanently delete every patient record. This action CANNOT be undone.`
-    );
-    if (!confirmed) return;
-
-    setDeletingPatients(true);
-    try {
-      const deletePromises = patients.map((p) => deleteDoc(doc(db, 'patients', p.uid)));
-      await Promise.all(deletePromises);
-
-      setPatients([]);
-      setSelectedPatient(null);
-      setSelectedPatientUids([]);
-    } catch (err) {
-      console.error('Failed to delete all patients:', err);
-      alert('Failed to delete all patient records.');
-    } finally {
-      setDeletingPatients(false);
-    }
-  };
-
-  // Appointment Selection & Deletion Logic
+  // ---- Appointment Selection & Deletion Logic (FIXED) ----
   const handleToggleSelectAppt = (id: string) => {
     setSelectedApptIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -828,6 +461,18 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  const handleDeleteSingleAppt = async (id: string, patientName?: string) => {
+    if (!window.confirm(`Are you sure you want to delete the appointment for "${patientName || 'this patient'}"?`)) return;
+    try {
+      await deleteDoc(doc(db, 'appointments', id));
+      setAppointments((prev) => prev.filter((a) => a.id !== id));
+      setSelectedApptIds((prev) => prev.filter((item) => item !== id));
+    } catch (err: any) {
+      console.error('Failed to delete appointment:', err);
+      alert(`Failed to delete appointment: ${err?.message || 'Unknown error. Check Firestore permissions.'}`);
+    }
+  };
+
   const handleDeleteSelectedAppts = async () => {
     if (selectedApptIds.length === 0) return;
     const count = selectedApptIds.length;
@@ -837,108 +482,77 @@ export const AdminApp: React.FC = () => {
     if (!confirmed) return;
 
     setDeletingAppts(true);
-    try {
-      const deletePromises = selectedApptIds.map((id) => deleteDoc(doc(db, 'appointments', id)));
-      await Promise.all(deletePromises);
+    setDeleteErrorMsg('');
 
-      setAppointments((prev) => prev.filter((a) => !selectedApptIds.includes(a.id)));
-      setSelectedApptIds([]);
-    } catch (err) {
-      console.error('Failed to delete selected appointments:', err);
-      alert('Failed to delete selected appointment records.');
-    } finally {
-      setDeletingAppts(false);
+    // Use allSettled instead of all — a single failure no longer silently
+    // blocks/hides the result of every other delete in the batch.
+    const results = await Promise.allSettled(
+      selectedApptIds.map(async (id) => {
+        await deleteDoc(doc(db, 'appointments', id));
+        return id;
+      })
+    );
+
+    const succeededIds: string[] = [];
+    const failures: string[] = [];
+
+    results.forEach((res, idx) => {
+      const targetId = selectedApptIds[idx];
+      if (res.status === 'fulfilled') {
+        succeededIds.push(res.value);
+      } else {
+        failures.push(targetId);
+        // Surface the real reason instead of swallowing it silently.
+        console.error(`Failed to delete appointment ${targetId}:`, res.reason);
+      }
+    });
+
+    if (succeededIds.length > 0) {
+      setAppointments((prev) => prev.filter((a) => !succeededIds.includes(a.id)));
+      setSelectedApptIds((prev) => prev.filter((id) => !succeededIds.includes(id)));
     }
+
+    if (failures.length > 0) {
+      const msg =
+        `${failures.length} of ${count} appointment(s) could not be deleted. ` +
+        `This is almost always caused by Firestore Security Rules blocking the delete for the ` +
+        `currently signed-in admin account — check Firebase Console → Firestore Database → Rules ` +
+        `and confirm "allow delete" is permitted for this user/collection.`;
+      setDeleteErrorMsg(msg);
+      alert(msg);
+    }
+
+    setDeletingAppts(false);
   };
 
   // Seed Initial Demo Data Function
   const seedDemoData = async () => {
-    if (!window.confirm('Seed default Doctors, Services, and Reviews into Firestore database?')) return;
+    if (!window.confirm('Seed default Doctors and Reviews into Firestore database?')) return;
     try {
-      // Seed Doctors
       const sampleDocs = [
         { name: 'Dr. Ajmaal Jami', specialty: 'General Physician', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
         { name: 'Dr. Saqib Zain', specialty: 'General Physician', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
         { name: 'Dr. Wajid Ali', specialty: 'Consultant Cardiologist & Physician', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. S. Kashif Mateen', specialty: 'Consultant General Surgeon & Laparoscopic Surgeon', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Hira', specialty: 'Child Specialist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. S.M. Hussain Hadi Naqvi', specialty: 'Child Specialist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Saud Abdul Qayyum', specialty: 'Child Specialist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Amir Hussain', specialty: 'Child Specialist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Syed Habib Ahmed', specialty: 'Child Specialist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Ghazala Naseem', specialty: 'Obstetrics & Gynaecologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Fauzia Ali', specialty: 'Obstetrics & Gynaecologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Misbah Noreen', specialty: 'Obstetrics & Gynaecologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Ferheen', specialty: 'Obstetrics & Gynaecologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Sanawar Pasha', specialty: 'Obstetrics & Gynaecologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Khurram Zia', specialty: 'Consultant Dental Surgeon', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Syed Saadat Ali', specialty: 'Cardiologist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Usman Alam', specialty: 'Cardiologist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Javeriya Qureshi', specialty: 'Sonologist & Radiologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Shabana Saeed', specialty: 'Sonologist & Radiologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Gulnaz Ismail', specialty: 'Sonologist & Radiologist', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. S.M. Shahnawaz', specialty: 'Sonologist & Radiologist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { 
-          name: 'Dr. Erum Kazim', 
-          specialty: 'General, Breast & Laparoscopic Surgeon', 
-          bio: 'Assistant Professor Surgery, Dow University of Health Sciences & Civil Hospital Karachi',
-          photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' 
-        },
-        { name: 'Dr. Mubashir Iqbal', specialty: 'General, Breast & Laparoscopic Surgeon', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Masood', specialty: 'General & Laparoscopic Surgeon', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Akhtar Baig', specialty: 'Orthopedic', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Nadia Adnan', specialty: 'General & Chest Physician', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Syed Ali Talha Raza', specialty: 'General & Chest Physician', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Shakeel Ahmed', specialty: 'Diabetologist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Qazi Mujahid Ali', specialty: 'Diabetologist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. M. Naseem Akhter', specialty: 'Family Physician', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Suresh Kumar', specialty: 'Gastroenterologist / Hepatologist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Bushra Rabbani', specialty: 'Consultant General Physician', photoURL: 'https://images.unsplash.com/photo-1594824813566-78a5e3752e51?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Moeen Qureshi', specialty: 'General & Dialysis Specialist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
-        { name: 'Dr. Asif Ali Abbasi', specialty: 'ENT Specialist', photoURL: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=400&q=80' },
       ];
 
       for (const d of sampleDocs) {
         await addDoc(collection(db, 'doctors'), d);
       }
 
-      // Seed Services
-      const sampleServices = [
-        { name: 'General Physician', description: 'Comprehensive adult outpatient consultations & health checkups', icon: 'stethoscope', department: 'General Medicine' },
-        { name: 'Orthopedic Surgery', description: 'Bone, joint, fracture & spinal care consultations', icon: 'activity', department: 'Orthopedics' },
-        { name: 'Cardiology', description: 'Consultant cardiac care & heart health diagnostics', icon: 'heart', department: 'Cardiology' },
-        { name: 'General & Laparoscopic Surgery', description: 'Minimally invasive laparoscopic & surgical procedures', icon: 'scissors', department: 'Surgery' },
-        { name: 'Pediatrics (Child Specialist)', description: 'Childhood healthcare, growth monitoring & vaccinations', icon: 'baby', department: 'Pediatrics' },
-        { name: 'Obstetrics & Gynaecology', description: 'Antenatal, postnatal maternity care & women health', icon: 'heart-pulse', department: 'Maternity' },
-        { name: 'Radiology & Sonology', description: 'Ultrasound scans, sonography & diagnostic radiology', icon: 'file-text', department: 'Diagnostics' },
-        { name: 'General, Breast & Laparoscopic Surgery', description: 'Specialized breast surgery & laparoscopic procedures', icon: 'shield', department: 'Surgery' },
-        { name: 'General & Chest Medicine (Pulmonology)', description: 'Respiratory care, asthma, chest infection & lung care', icon: 'wind', department: 'Pulmonology' },
-        { name: 'Diabetology', description: 'Diabetes control, blood sugar regulation & counseling', icon: 'activity', department: 'Diabetology' },
-        { name: 'Family Medicine', description: 'Holistic primary care for all family members', icon: 'users', department: 'Primary Care' },
-        { name: 'Gastroenterology & Hepatology', description: 'Liver, stomach acidity, digestive & intestinal health', icon: 'activity', department: 'Gastroenterology' },
-        { name: 'Dialysis', description: 'Hemodialysis support services & renal care', icon: 'droplet', department: 'Nephrology' },
-        { name: 'ENT', description: 'Ear, nose, throat & sinus treatment', icon: 'stethoscope', department: 'ENT' },
-        { name: 'Dental', description: 'Dental surgery, oral hygiene & preventive dental care', icon: 'smile', department: 'Dental' },
-      ];
-
-      for (const s of sampleServices) {
-        await addDoc(collection(db, 'services'), s);
-      }
-
-      // Seed Sample Reviews
       const sampleReviews = [
         { patientName: 'Kamran Siddiqui', rating: 5, comment: 'Brought my mother to the 24/7 emergency ward at midnight. Excellent care!', approved: true, createdAt: new Date().toISOString() },
-        { patientName: 'Shazia Parveen', rating: 5, comment: 'Very polite staff and clean premises in Gulberg Town Karachi.', approved: true, createdAt: new Date().toISOString() }
+        { patientName: 'Shazia Parveen', rating: 5, comment: 'Very polite staff and clean premises in Gulberg Town Karachi.', approved: true, createdAt: new Date().toISOString() },
       ];
 
       for (const r of sampleReviews) {
         await addDoc(collection(db, 'reviews'), r);
       }
 
-      setSeedSuccessMsg('Demo doctors, services, and reviews seeded successfully!');
+      setSeedSuccessMsg('Demo doctors and reviews seeded successfully!');
       fetchAllAdminData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Seeding error:', err);
+      alert(`Seeding failed: ${err?.message || 'Unknown error.'}`);
     }
   };
 
@@ -996,7 +610,6 @@ export const AdminApp: React.FC = () => {
                   <span className="bg-amber-200 text-amber-950 font-bold px-2 py-0.5 rounded-full text-[10px]">
                     {failedAttempts} / {MAX_LOGIN_ATTEMPTS} attempts
                   </span>
-                
                 </div>
               </div>
             )
@@ -1068,10 +681,8 @@ export const AdminApp: React.FC = () => {
 
   // Filtered Appointments for Admin Dashboard Table
   const filteredAppointments = appointments.filter((a) => {
-    // Status Filter
     const matchesStatus = apptStatusFilter === 'all' || a.status === apptStatusFilter;
 
-    // Search Query
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !q ||
@@ -1080,7 +691,6 @@ export const AdminApp: React.FC = () => {
       a.service.toLowerCase().includes(q) ||
       (a.doctorName && a.doctorName.toLowerCase().includes(q));
 
-    // Date Filter Mode
     let matchesDate = true;
     if (apptDateFilterMode === 'today') {
       matchesDate = a.preferredDate === todayStr;
@@ -1094,17 +704,6 @@ export const AdminApp: React.FC = () => {
     return matchesStatus && matchesSearch && matchesDate;
   });
 
-  // Filtered Patients for Admin Patient Directory
-  const filteredPatientsList = patients.filter((p) => {
-    const q = patientSearchQuery.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.email && p.email.toLowerCase().includes(q)) ||
-      (p.phone && p.phone.toLowerCase().includes(q))
-    );
-  });
-
   // Flexible CSV Export Handler
   const executeCSVDownload = (
     dataScope: 'current_view' | 'all' | 'today' | 'specific' | 'range',
@@ -1115,7 +714,6 @@ export const AdminApp: React.FC = () => {
   ) => {
     let sourceList = appointments;
 
-    // Filter by Date Scope
     if (dataScope === 'current_view') {
       sourceList = filteredAppointments;
     } else if (dataScope === 'today') {
@@ -1130,7 +728,6 @@ export const AdminApp: React.FC = () => {
       });
     }
 
-    // Filter by Status if specified (when scope is not 'current_view' which is pre-filtered)
     if (dataScope !== 'current_view' && statusVal && statusVal !== 'all') {
       sourceList = sourceList.filter((a) => a.status === statusVal);
     }
@@ -1149,7 +746,7 @@ export const AdminApp: React.FC = () => {
       'Preferred Date',
       'Preferred Time Slot',
       'Status',
-      'Booking Created At'
+      'Booking Created At',
     ];
 
     const escapeCsv = (str?: string) => {
@@ -1166,7 +763,7 @@ export const AdminApp: React.FC = () => {
       escapeCsv(a.preferredDate),
       escapeCsv(a.preferredTime),
       escapeCsv(a.status),
-      escapeCsv(a.createdAt ? new Date(a.createdAt).toLocaleString() : 'N/A')
+      escapeCsv(a.createdAt ? new Date(a.createdAt).toLocaleString() : 'N/A'),
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
@@ -1189,7 +786,6 @@ export const AdminApp: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Preview count helper for CSV Modal
   const getCSVExportPreviewCount = () => {
     let list = appointments;
     if (exportScope === 'current_view') {
@@ -1212,13 +808,11 @@ export const AdminApp: React.FC = () => {
     return list.length;
   };
 
-  // Today's appointments count
   const apptsToday = appointments.filter((a) => a.preferredDate === todayStr).length;
   const pendingCount = appointments.filter((a) => a.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-[#F5F1E8] text-[#0B6B4E] pb-20 font-sans">
-      
       {/* Top Admin Bar */}
       <div className="bg-[#0B6B4E] text-white py-4 px-4 sm:px-8 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1238,18 +832,9 @@ export const AdminApp: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowLogsModal(true)}
-              className="bg-emerald-800 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold border border-emerald-600 flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="View dispatched SMS and Email confirmation logs"
-            >
-              <BellRing className="w-3.5 h-3.5 text-amber-300" />
-              <span>SMS/Email Logs ({dispatchedAlerts.length})</span>
-            </button>
-
-            <button
               onClick={seedDemoData}
               className="bg-emerald-800 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold border border-emerald-600 flex items-center gap-1.5"
-              title="Seed default doctors, services, reviews"
+              title="Seed default doctors and reviews"
             >
               <Database className="w-3.5 h-3.5" />
               <span>Seed Initial Data</span>
@@ -1267,7 +852,6 @@ export const AdminApp: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-8 mt-6 space-y-6">
-        
         {seedSuccessMsg && (
           <div className="p-3 bg-emerald-100 text-[#0B6B4E] text-xs font-bold rounded-xl border border-emerald-300">
             {seedSuccessMsg}
@@ -1298,7 +882,7 @@ export const AdminApp: React.FC = () => {
 
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-900/10 flex items-center gap-3">
             <div className="p-3 bg-blue-100 text-blue-800 rounded-xl">
-              <Users className="w-5 h-5" />
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
               <div className="text-xl font-bold font-heading">{patients.length}</div>
@@ -1317,7 +901,7 @@ export const AdminApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Admin Tabs */}
+        {/* Admin Tabs (Services and Patients & Reports removed) */}
         <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-emerald-900/10 flex flex-wrap gap-1">
           <button
             onClick={() => setActiveTab('appointments')}
@@ -1334,22 +918,6 @@ export const AdminApp: React.FC = () => {
             }`}
           >
             Manage Doctors ({doctors.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('services')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === 'services' ? 'bg-[#0B6B4E] text-white' : 'text-emerald-900 hover:bg-[#F5F1E8]'
-            }`}
-          >
-            Services ({services.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('patients')}
-            className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-              activeTab === 'patients' ? 'bg-[#0B6B4E] text-white' : 'text-emerald-900 hover:bg-[#F5F1E8]'
-            }`}
-          >
-            Patients & Reports
           </button>
           <button
             onClick={() => setActiveTab('reviews')}
@@ -1373,7 +941,6 @@ export const AdminApp: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-                {/* Search */}
                 <div className="relative flex-1 min-w-[160px] sm:flex-initial">
                   <Search className="w-3.5 h-3.5 text-emerald-700 absolute left-3 top-2.5" />
                   <input
@@ -1385,7 +952,6 @@ export const AdminApp: React.FC = () => {
                   />
                 </div>
 
-                {/* Status Filter */}
                 <select
                   value={apptStatusFilter}
                   onChange={(e) => setApptStatusFilter(e.target.value)}
@@ -1398,7 +964,6 @@ export const AdminApp: React.FC = () => {
                   <option value="cancelled">Cancelled</option>
                 </select>
 
-                {/* Date Filter Dropdown */}
                 <select
                   value={apptDateFilterMode}
                   onChange={(e) => setApptDateFilterMode(e.target.value as any)}
@@ -1410,7 +975,6 @@ export const AdminApp: React.FC = () => {
                   <option value="range">Date Range</option>
                 </select>
 
-                {/* Specific Date Picker */}
                 {apptDateFilterMode === 'specific' && (
                   <input
                     type="date"
@@ -1420,14 +984,12 @@ export const AdminApp: React.FC = () => {
                   />
                 )}
 
-                {/* Date Range Pickers */}
                 {apptDateFilterMode === 'range' && (
                   <div className="flex items-center gap-1">
                     <input
                       type="date"
                       value={apptStartDate}
                       onChange={(e) => setApptStartDate(e.target.value)}
-                      placeholder="Start"
                       className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-2 py-1.5 font-bold text-[#0B6B4E] w-28"
                     />
                     <span className="text-xs text-emerald-800 font-bold">to</span>
@@ -1435,13 +997,11 @@ export const AdminApp: React.FC = () => {
                       type="date"
                       value={apptEndDate}
                       onChange={(e) => setApptEndDate(e.target.value)}
-                      placeholder="End"
                       className="bg-[#F5F1E8] text-xs border border-emerald-900/20 rounded-xl px-2 py-1.5 font-bold text-[#0B6B4E] w-28"
                     />
                   </div>
                 )}
 
-                {/* Reset Filters button if any active */}
                 {(apptStatusFilter !== 'all' || searchQuery || apptDateFilterMode !== 'all') && (
                   <button
                     onClick={() => {
@@ -1457,7 +1017,6 @@ export const AdminApp: React.FC = () => {
                   </button>
                 )}
 
-                {/* Main CSV Export Options Modal Trigger */}
                 <button
                   onClick={() => {
                     setExportScope('current_view');
@@ -1470,19 +1029,25 @@ export const AdminApp: React.FC = () => {
                   <span>Export to CSV</span>
                 </button>
 
-                {/* Delete Selected Appointments Button */}
                 <button
                   type="button"
                   disabled={selectedApptIds.length === 0 || deletingAppts}
                   onClick={handleDeleteSelectedAppts}
                   className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={selectedApptIds.length === 0 ? "Select appointments to delete" : `Delete ${selectedApptIds.length} selected appointment(s)`}
+                  title={selectedApptIds.length === 0 ? 'Select appointments to delete' : `Delete ${selectedApptIds.length} selected appointment(s)`}
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span>Delete ({selectedApptIds.length})</span>
+                  <span>{deletingAppts ? 'Deleting...' : `Delete (${selectedApptIds.length})`}</span>
                 </button>
               </div>
             </div>
+
+            {deleteErrorMsg && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>{deleteErrorMsg}</span>
+              </div>
+            )}
 
             {filteredAppointments.length === 0 ? (
               <div className="text-center py-8 text-xs text-emerald-800">
@@ -1556,49 +1121,30 @@ export const AdminApp: React.FC = () => {
                             >
                               {a.status.toUpperCase()}
                             </span>
-
-                            {a.status === 'cancelled' && a.cancellationMessage && (
-                              <div className="mt-1.5 text-[10px] text-red-900 bg-red-50 p-2 rounded-lg border border-red-200/80 space-y-0.5 max-w-xs">
-                                <div className="font-bold text-red-800">
-                                  💬 "{a.cancellationMessage}"
-                                </div>
-                                {a.smsSent === true ? (
-                                  <div className="text-emerald-700 font-bold flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                    <span>SMS Sent</span>
-                                  </div>
-                                ) : a.smsSent === false ? (
-                                  <div className="text-red-600 font-bold flex items-center gap-1" title={a.smsError}>
-                                    <AlertCircle className="w-3 h-3 text-red-600 shrink-0" />
-                                    <span>SMS Failed ({a.smsError || 'Error'})</span>
-                                  </div>
-                                ) : null}
-                              </div>
-                            )}
                           </td>
-                          <td className="p-3 space-y-1">
-                            <select
-                              value={a.status}
-                              onChange={(e) =>
-                                handleUpdateApptStatus(a.id, e.target.value as AppointmentStatus)
-                              }
-                              className="bg-[#F5F1E8] border border-emerald-900/20 rounded-lg text-xs font-bold py-1 px-2 focus:outline-none cursor-pointer"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="confirmed">Confirm</option>
-                              <option value="completed">Complete</option>
-                              <option value="cancelled">Cancel</option>
-                            </select>
-
-                            {a.status === 'confirmed' && (
-                              <button
-                                onClick={() => sendConfirmationAlert(a)}
-                                className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-[#0B6B4E] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
-                                title="Resend SMS and Email confirmation alert to patient"
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={a.status}
+                                onChange={(e) =>
+                                  handleUpdateApptStatus(a.id, e.target.value as AppointmentStatus)
+                                }
+                                className="bg-[#F5F1E8] border border-emerald-900/20 rounded-lg text-xs font-bold py-1 px-2 focus:outline-none cursor-pointer"
                               >
-                                <Send className="w-3 h-3 text-[#0B6B4E]" /> Send Alert
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirm</option>
+                                <option value="completed">Complete</option>
+                                <option value="cancelled">Cancel</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSingleAppt(a.id, a.patientName)}
+                                title="Delete Appointment"
+                                className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1698,238 +1244,7 @@ export const AdminApp: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: SERVICES */}
-        {activeTab === 'services' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
-            <h2 className="font-heading font-bold text-lg">Hospital Services & Care Units</h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {services.map((s) => (
-                <div key={s.id} className="p-4 bg-[#F5F1E8] rounded-2xl border border-emerald-900/10 space-y-2">
-                  <div className="font-bold text-sm text-[#0B6B4E]">{s.name}</div>
-                  <div className="text-xs text-emerald-900/80">{s.description}</div>
-                  {s.department && (
-                    <span className="inline-block text-[10px] bg-emerald-100 text-[#0B6B4E] font-bold px-2 py-0.5 rounded-full">
-                      {s.department}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: PATIENTS & REPORTS */}
-        {activeTab === 'patients' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-6">
-            {/* Header with Title and Global Action Buttons */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-900/10 pb-4">
-              <div>
-                <h2 className="font-heading font-bold text-lg text-gray-900">Registered Patients & Document Uploads</h2>
-                <p className="text-xs text-gray-500 font-medium">Manage patient profiles, delete selected or all data, and attach lab reports.</p>
-              </div>
-
-              {/* Action Buttons: Delete Selected & Delete All */}
-              <div className="flex items-center gap-2.5 shrink-0">
-                {selectedPatientUids.length > 0 && (
-                  <button
-                    type="button"
-                    disabled={deletingPatients}
-                    onClick={handleDeleteSelectedPatients}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Selected ({selectedPatientUids.length})</span>
-                  </button>
-                )}
-
-                {patients.length > 0 && (
-                  <button
-                    type="button"
-                    disabled={deletingPatients}
-                    onClick={handleDeleteAllPatients}
-                    className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                    <span>Delete All Patients ({patients.length})</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Patient List */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-[#0B6B4E]">
-                    Patient Directory ({patients.length})
-                  </h3>
-
-                  {patients.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAllPatients(filteredPatientsList)}
-                      className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer"
-                    >
-                      {filteredPatientsList.length > 0 &&
-                      filteredPatientsList.every((p) => selectedPatientUids.includes(p.uid))
-                        ? 'Deselect All'
-                        : 'Select All Visible'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Patient Search Bar */}
-                <div className="relative">
-                  <Search className="w-4 h-4 text-emerald-700 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search patient by name, email, or phone..."
-                    value={patientSearchQuery}
-                    onChange={(e) => setPatientSearchQuery(e.target.value)}
-                    className="w-full bg-[#F5F1E8] border border-emerald-900/15 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0B6B4E]"
-                  />
-                </div>
-
-                {patients.length === 0 ? (
-                  <div className="text-xs text-emerald-800 bg-[#F5F1E8] p-4 rounded-xl border border-dashed border-emerald-900/20 text-center">
-                    No registered patient profiles in system database.
-                  </div>
-                ) : filteredPatientsList.length === 0 ? (
-                  <div className="text-xs text-emerald-800 bg-[#F5F1E8] p-4 rounded-xl text-center">
-                    No patients matching "{patientSearchQuery}".
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                    {filteredPatientsList.map((p) => {
-                      const isChecked = selectedPatientUids.includes(p.uid);
-                      const isSelectedForReport = selectedPatient?.uid === p.uid;
-
-                      return (
-                        <div
-                          key={p.uid}
-                          className={`p-3 rounded-xl border text-xs transition-all flex items-center justify-between gap-3 ${
-                            isSelectedForReport
-                              ? 'bg-[#0B6B4E] text-white border-[#0B6B4E] shadow-sm'
-                              : isChecked
-                              ? 'bg-red-50 text-gray-900 border-red-300'
-                              : 'bg-[#F5F1E8] text-[#0B6B4E] border-emerald-900/10 hover:border-emerald-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {/* Selection Checkbox */}
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleToggleSelectPatient(p.uid)}
-                              className="w-4 h-4 accent-red-600 rounded cursor-pointer shrink-0"
-                            />
-
-                            {/* Patient Info (Clicking selects for attaching report) */}
-                            <div
-                              onClick={() => {
-                                setSelectedPatient(p);
-                                setReportUploadSuccess('');
-                              }}
-                              className="cursor-pointer min-w-0 flex-1"
-                            >
-                              <div className="font-bold truncate">{p.name}</div>
-                              <div
-                                className={`text-[11px] truncate ${
-                                  isSelectedForReport ? 'text-emerald-100' : 'opacity-80'
-                                }`}
-                              >
-                                {p.email} • {p.phone || 'No phone'}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Individual Action Buttons */}
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSinglePatient(p);
-                              }}
-                              title="Delete Patient Record"
-                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                isSelectedForReport
-                                  ? 'bg-red-500/20 hover:bg-red-500/40 text-white'
-                                  : 'hover:bg-red-100 text-red-600'
-                              }`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Upload Form for Selected Patient */}
-              <div className="bg-[#F5F1E8] p-5 rounded-2xl border border-emerald-900/10 space-y-4">
-                <h3 className="font-bold text-sm text-[#0B6B4E] flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  Attach Lab Report to Patient
-                </h3>
-
-                {selectedPatient ? (
-                  <form onSubmit={handleUploadPatientReport} className="space-y-3">
-                    <div className="text-xs font-bold text-[#0B6B4E]">
-                      Selected: {selectedPatient.name} ({selectedPatient.email})
-                    </div>
-
-                    {reportUploadSuccess && (
-                      <div className="p-2 bg-emerald-100 text-[#0B6B4E] text-xs font-bold rounded-lg">
-                        {reportUploadSuccess}
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1">Report / Document Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Complete Blood Count (CBC) Report"
-                        value={reportFileName}
-                        onChange={(e) => setReportFileName(e.target.value)}
-                        className="w-full bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold mb-1">File URL / Download Link</label>
-                      <input
-                        type="url"
-                        required
-                        placeholder="https://example.com/reports/patient-lab.pdf"
-                        value={reportFileUrl}
-                        onChange={(e) => setReportFileUrl(e.target.value)}
-                        className="w-full bg-white border border-emerald-900/20 rounded-xl px-3 py-2 text-xs"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full bg-[#0B6B4E] hover:bg-[#08523c] text-white py-2 rounded-xl text-xs font-bold shadow"
-                    >
-                      Attach Report File
-                    </button>
-                  </form>
-                ) : (
-                  <div className="text-xs text-emerald-800 text-center py-6">
-                    Select a patient from the list on the left to attach a diagnostic report.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 5: REVIEWS */}
+        {/* TAB 3: REVIEWS */}
         {activeTab === 'reviews' && (
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-900/10 space-y-4">
             <h2 className="font-heading font-bold text-lg">Patient Reviews & Moderation</h2>
@@ -1970,7 +1285,6 @@ export const AdminApp: React.FC = () => {
             </div>
           </div>
         )}
-
       </div>
 
       {/* Doctor Modal */}
@@ -2077,150 +1391,6 @@ export const AdminApp: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Toast Notification for Dispatched Confirmation Alert */}
-      {activeToastAlert && (
-        <div className="fixed bottom-5 right-5 z-50 w-full max-w-md bg-white border-2 border-emerald-600 rounded-2xl shadow-2xl p-4 text-[#0B6B4E] space-y-3 animate-in fade-in slide-in-from-bottom-5">
-          <div className="flex items-start justify-between gap-2 border-b border-emerald-900/10 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-emerald-100 text-[#0B6B4E] rounded-xl">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <h4 className="font-bold text-[10px] uppercase tracking-wider text-emerald-800">Alert Dispatched</h4>
-                <p className="font-heading font-extrabold text-sm text-[#0B6B4E]">SMS & Email Confirmation Sent</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveToastAlert(null)}
-              className="text-emerald-800 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between font-bold text-emerald-950">
-              <span>Patient: {activeToastAlert.patientName}</span>
-              <span className="text-[10px] bg-emerald-100 text-[#0B6B4E] font-extrabold px-2 py-0.5 rounded-full">{activeToastAlert.timestamp}</span>
-            </div>
-
-            <div className="bg-[#F5F1E8] p-2.5 rounded-xl border border-emerald-900/10 space-y-1">
-              <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-[11px]">
-                <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
-                <span>SMS Alert ({activeToastAlert.phone}):</span>
-              </div>
-              <p className="text-[11px] italic text-emerald-950 bg-white p-2 rounded-lg border border-emerald-900/10 leading-snug">
-                "{activeToastAlert.smsBody}"
-              </p>
-            </div>
-
-            <div className="bg-[#F5F1E8] p-2.5 rounded-xl border border-emerald-900/10 space-y-1">
-              <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-[11px]">
-                <MailCheck className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Email Alert ({activeToastAlert.email}):</span>
-              </div>
-              <p className="text-[11px] font-semibold text-emerald-900 truncate">
-                {activeToastAlert.emailSubject}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <button
-              onClick={() => {
-                setShowLogsModal(true);
-              }}
-              className="text-[11px] text-[#0B6B4E] font-bold underline hover:text-emerald-800 cursor-pointer"
-            >
-              View Full Message Log
-            </button>
-
-            <button
-              onClick={() => setActiveToastAlert(null)}
-              className="bg-[#0B6B4E] hover:bg-[#08523c] text-white font-bold py-1 px-3 rounded-lg text-xs cursor-pointer shadow transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Dispatched Notification Alert Logs Modal */}
-      {showLogsModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white text-[#0B6B4E] w-full max-w-2xl rounded-2xl p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <BellRing className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-heading font-bold text-base">Dispatched SMS & Email Confirmation Logs</h3>
-              </div>
-              <button onClick={() => setShowLogsModal(false)} className="cursor-pointer text-emerald-800 hover:text-emerald-950">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto space-y-3 flex-1 pr-1 text-xs">
-              {dispatchedAlerts.length === 0 ? (
-                <div className="text-center py-8 text-emerald-800 font-medium">
-                  No confirmation alerts dispatched yet in this session. Change an appointment status to "Confirmed" to auto-dispatch.
-                </div>
-              ) : (
-                dispatchedAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="p-4 bg-[#F5F1E8] rounded-2xl border border-emerald-900/10 space-y-2.5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-900/10 pb-2">
-                      <div className="font-bold text-sm text-[#0B6B4E] flex items-center gap-2">
-                        <span>{alert.patientName}</span>
-                        <span className="text-[10px] bg-emerald-100 text-[#0B6B4E] font-extrabold px-2 py-0.5 rounded-full">
-                          {alert.service}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-emerald-800 font-mono">{alert.timestamp}</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="bg-white p-2.5 rounded-xl border border-emerald-900/10 space-y-1">
-                        <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-[11px]">
-                          <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>SMS Sent to: {alert.phone}</span>
-                        </div>
-                        <p className="text-[11px] text-emerald-950 font-sans italic leading-relaxed">
-                          "{alert.smsBody}"
-                        </p>
-                      </div>
-
-                      <div className="bg-white p-2.5 rounded-xl border border-emerald-900/10 space-y-1">
-                        <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-[11px]">
-                          <MailCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Email Sent to: {alert.email}</span>
-                        </div>
-                        <p className="text-[11px] font-bold text-emerald-900">
-                          {alert.emailSubject}
-                        </p>
-                        <p className="text-[10px] text-emerald-800 whitespace-pre-line line-clamp-3">
-                          {alert.emailBody}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="pt-2 border-t flex justify-end">
-              <button
-                onClick={() => setShowLogsModal(false)}
-                className="bg-[#0B6B4E] text-white px-4 py-2 rounded-xl text-xs font-bold shadow cursor-pointer hover:bg-[#08523c]"
-              >
-                Close Logs
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* CSV Export Options Modal */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -2244,7 +1414,6 @@ export const AdminApp: React.FC = () => {
             </div>
 
             <div className="space-y-4 text-xs">
-              {/* Option 1: Date Filter Selection */}
               <div className="space-y-2">
                 <label className="font-bold uppercase tracking-wider text-[11px] text-emerald-900 block">
                   1. Choose Export Date Option:
@@ -2343,7 +1512,6 @@ export const AdminApp: React.FC = () => {
                 </div>
               </div>
 
-              {/* Specific Date Picker Input */}
               {exportScope === 'specific' && (
                 <div className="bg-[#F5F1E8] p-3 rounded-xl space-y-1 border border-emerald-900/10">
                   <label className="font-bold text-emerald-900 text-xs">Select Target Calendar Day:</label>
@@ -2356,7 +1524,6 @@ export const AdminApp: React.FC = () => {
                 </div>
               )}
 
-              {/* Date Range Picker Inputs */}
               {exportScope === 'range' && (
                 <div className="bg-[#F5F1E8] p-3 rounded-xl border border-emerald-900/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -2380,7 +1547,6 @@ export const AdminApp: React.FC = () => {
                 </div>
               )}
 
-              {/* Option 2: Status Filter */}
               {exportScope !== 'current_view' && (
                 <div className="space-y-1">
                   <label className="font-bold uppercase tracking-wider text-[11px] text-emerald-900 block">
@@ -2400,7 +1566,6 @@ export const AdminApp: React.FC = () => {
                 </div>
               )}
 
-              {/* Matching Summary Badge */}
               <div className="p-3 bg-emerald-100/70 border border-emerald-300 rounded-xl flex items-center justify-between text-xs font-bold text-[#0B6B4E]">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-emerald-700" />
@@ -2441,150 +1606,6 @@ export const AdminApp: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* CANCEL APPOINTMENT MODAL / CARD DIALOG */}
-      {cancellingAppt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white text-gray-900 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-5 border border-red-100 animate-in fade-in zoom-in-95">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-red-100 text-[#D64545] rounded-xl shrink-0">
-                  <AlertCircle className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-heading font-extrabold text-lg text-gray-900">
-                    Cancel Appointment
-                  </h3>
-                  <p className="text-xs text-gray-500 font-medium">
-                    Send custom message to patient & mark appointment as cancelled
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCancellingAppt(null)}
-                disabled={cancelSubmitting}
-                className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Appointment Details Summary Card */}
-            <div className="bg-[#F5F1E8] p-3.5 rounded-xl border border-emerald-900/10 text-xs space-y-1">
-              <div className="flex items-center justify-between font-bold text-[#0B6B4E]">
-                <span>Patient: {cancellingAppt.patientName}</span>
-                <span className="text-emerald-900 bg-white px-2 py-0.5 rounded-md border border-emerald-900/10 font-mono">
-                  📱 {cancellingAppt.phone || cancellingAppt.patientPhone || 'No phone'}
-                </span>
-              </div>
-              <div className="text-emerald-900/80">
-                <span className="font-semibold">{cancellingAppt.service}</span> • {cancellingAppt.doctorName || 'Duty Specialist'}
-              </div>
-              <div className="text-emerald-800 text-[11px]">
-                📅 {cancellingAppt.preferredDate} at {cancellingAppt.preferredTime}
-              </div>
-            </div>
-
-            {/* Form Input: Message to Patient */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-                <span>Message to Patient *</span>
-                <span className="text-[10px] text-gray-500 font-normal">Custom SMS text</span>
-              </label>
-
-              <textarea
-                rows={4}
-                required
-                disabled={cancelSubmitting}
-                placeholder="e.g. Doctor is unavailable today, please reschedule."
-                value={cancelMessage}
-                onChange={(e) => {
-                  setCancelMessage(e.target.value);
-                  if (e.target.value.trim()) {
-                    setCancelValidationError('');
-                  }
-                }}
-                className={`w-full bg-white border ${
-                  cancelValidationError ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'
-                } rounded-xl p-3 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0B6B4E] font-sans leading-relaxed`}
-              />
-
-              {/* Inline Validation Text */}
-              {cancelValidationError && (
-                <div className="flex items-center gap-1.5 text-red-600 text-xs font-bold pt-0.5">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-600" />
-                  <span>{cancelValidationError}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="pt-2 border-t border-gray-100 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setCancellingAppt(null)}
-                disabled={cancelSubmitting}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer transition-colors disabled:opacity-50"
-              >
-                Close
-              </button>
-
-              <button
-                type="button"
-                onClick={handleConfirmCancelAppointment}
-                disabled={cancelSubmitting}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#D64545] hover:bg-[#c23737] shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
-              >
-                {cancelSubmitting ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send & Cancel</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast Alert for Cancel SMS Result */}
-      {cancelToastAlert && (
-        <div className="fixed bottom-5 right-5 z-50 w-full max-w-md bg-white border-2 border-amber-500 rounded-2xl shadow-2xl p-4 text-gray-900 space-y-2 animate-in fade-in slide-in-from-bottom-5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className={`p-2 rounded-xl ${cancelToastAlert.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-heading font-extrabold text-sm text-gray-900">{cancelToastAlert.title}</h4>
-                <p className="text-xs text-gray-700 font-medium leading-relaxed mt-0.5">{cancelToastAlert.message}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setCancelToastAlert(null)}
-              className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex justify-end pt-1">
-            <button
-              onClick={() => setCancelToastAlert(null)}
-              className="bg-gray-900 hover:bg-black text-white font-bold py-1 px-3 rounded-lg text-xs cursor-pointer shadow transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };

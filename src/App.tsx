@@ -8,6 +8,7 @@ import { FloatingWhatsApp } from './components/common/FloatingWhatsApp';
 import { HomePage } from './pages/HomePage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
 import { AboutPage } from './pages/AboutPage';
+import { ContactPage } from './pages/ContactPage';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -26,10 +27,22 @@ const DepartmentDetailPage = lazy(() =>
 
 const AppContent: React.FC = () => {
   const [globalBookingOpen, setGlobalBookingOpen] = useState(false);
+  const [globalDoctorId, setGlobalDoctorId] = useState<string | undefined>(undefined);
+  const [globalServiceId, setGlobalServiceId] = useState<string | undefined>(undefined);
   const location = useLocation();
 
   React.useEffect(() => {
-    const handleOpen = () => setGlobalBookingOpen(true);
+    const handleOpen = (e: Event) => {
+      const customEvent = e as CustomEvent<{ doctorId?: string; departmentId?: string; serviceId?: string }>;
+      if (customEvent && customEvent.detail) {
+        setGlobalDoctorId(customEvent.detail.doctorId);
+        setGlobalServiceId(customEvent.detail.departmentId || customEvent.detail.serviceId);
+      } else {
+        setGlobalDoctorId(undefined);
+        setGlobalServiceId(undefined);
+      }
+      setGlobalBookingOpen(true);
+    };
     window.addEventListener('open-booking-modal', handleOpen);
     return () => window.removeEventListener('open-booking-modal', handleOpen);
   }, []);
@@ -63,6 +76,8 @@ const AppContent: React.FC = () => {
             <Route path="/doctors.html" element={<DepartmentsPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/about.html" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/contact.html" element={<ContactPage />} />
             <Route path="/portal/*" element={<PortalPage />} />
             <Route path="/admin/*" element={<AdminApp />} />
             <Route path="/admin.html" element={<AdminApp />} />
@@ -79,7 +94,13 @@ const AppContent: React.FC = () => {
 
       <BookingModal
         isOpen={globalBookingOpen}
-        onClose={() => setGlobalBookingOpen(false)}
+        onClose={() => {
+          setGlobalBookingOpen(false);
+          setGlobalDoctorId(undefined);
+          setGlobalServiceId(undefined);
+        }}
+        preselectedDoctorId={globalDoctorId}
+        preselectedServiceId={globalServiceId}
       />
     </div>
   );
